@@ -1,44 +1,56 @@
+FlowWithCSV.tsx
+
 import React, { useState, useCallback } from 'react';
-import ReactFlow, { Controls, Background } from 'reactflow';
+import ReactFlow, { Controls, Background, Node } from 'reactflow';
 import 'reactflow/dist/style.css';
 import Papa from 'papaparse';
 
-const FlowWithCSV = () => {
-  const [nodes, setNodes] = useState([]);
+interface CSVNode {
+  node: string;
+  type: string;
+  name: string;
+  value: string;
+  graphdepth: number;
+  'parent node': string;
+}
+
+const FlowWithCSV: React.FC = () => {
+  const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState([]);
 
-  const handleFileUpload = useCallback((event) => {
-    const file = event.target.files[0];
-    Papa.parse(file, {
-      header: true,
-      complete: (results) => {
-        const data = results.data;
-        const processedNodes = data.map((item, index) => ({
-          id: item.node,
-          type: item.type,
-          data: { label: item.name, value: item.value, graphdepth: item.graphdepth, parentNode: item['parent node'] },
-          position: { x: 0, y: 0 }, // Initial positions, to be calculated
-        }));
+  const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      Papa.parse<CSVNode>(file, {
+        header: true,
+        complete: (results) => {
+          const data = results.data;
+          const processedNodes: Node[] = data.map((item) => ({
+            id: item.node,
+            type: item.type,
+            data: { label: item.name, value: item.value, graphdepth: item.graphdepth, parentNode: item['parent node'] },
+            position: { x: 0, y: 0 }, // Initial positions, to be calculated
+          }));
 
-        // Calculate positions based on graph depth and parent node
-        const positionedNodes = calculateNodePositions(processedNodes);
+          const positionedNodes = calculateNodePositions(processedNodes);
+          setNodes(positionedNodes);
 
-        setNodes(positionedNodes);
-        // Optionally, set edges if you want to show connections
-        // setEdges(generateEdges(data)); 
-      },
-    });
+          // Optionally, set edges if you want to show connections
+          setEdges(generateEdges(positionedNodes));
+        },
+      });
+    }
   }, []);
 
-  // Function to calculate node positions dynamically
-  const calculateNodePositions = (nodes) => {
-    const nodeMap = {};
+  const calculateNodePositions = (nodes: Node[]) => {
+    const nodeMap: { [key: string]: Node } = {};
     const spacingX = 200;
     const spacingY = 100;
 
     nodes.forEach(node => {
-      if (node.data.parentNode) {
-        const parent = nodeMap[node.data.parentNode];
+      const parentNode = (node.data as any).parentNode;
+      if (parentNode) {
+        const parent = nodeMap[parentNode];
         node.position = {
           x: parent.position.x + spacingX,
           y: parent.position.y + (parent.childrenCount || 1) * spacingY,
@@ -47,13 +59,28 @@ const FlowWithCSV = () => {
       } else {
         node.position = {
           x: 0,
-          y: (node.data.graphdepth - 1) * spacingY,
+          y: ((node.data as any).graphdepth - 1) * spacingY,
         };
       }
       nodeMap[node.id] = node;
     });
 
     return nodes;
+  };
+
+  const generateEdges = (nodes: Node[]) => {
+    const edges = [];
+    nodes.forEach(node => {
+      const parentNode = (node.data as any).parentNode;
+      if (parentNode) {
+        edges.push({
+          id: `e-${parentNode}-${node.id}`,
+          source: parentNode,
+          target: node.id,
+        });
+      }
+    });
+    return edges;
   };
 
   return (
@@ -69,16 +96,64 @@ const FlowWithCSV = () => {
 
 export default FlowWithCSV;
 
-const generateEdges = (nodes) => {
-  const edges = [];
-  nodes.forEach(node => {
-    if (node.data.parentNode) {
-      edges.push({
-        id: `e-${node.data.parentNode}-${node.id}`,
-        source: node.data.parentNode,
-        target: node.id,
-      });
-    }
-  });
-  return edges;
-};
+
+
+
+
+
+
+
+
+import React from 'react';
+import FlowWithCSV from './FlowWithCSV';
+
+const App: React.FC = () => {
+  return (
+    <div style={{ height: '100vh' }}>
+      <FlowWithCSV />
+    </div>
+  );
+}
+
+export default App;
+
+
+
+
+
+
+
+
+
+
+{
+  "compilerOptions": {
+    "target": "es5",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "module": "esnext",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx"
+  },
+  "include": ["src"]
+}
+
+
+
+
+
+
+
+
+
+
+
