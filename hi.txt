@@ -1,31 +1,22 @@
-FlowWithCSV.tsx
+FlowWithCSV.js
 
 import React, { useState, useCallback } from 'react';
-import ReactFlow, { Controls, Background, Node } from 'reactflow';
+import ReactFlow, { Controls, Background } from 'reactflow';
 import 'reactflow/dist/style.css';
 import Papa from 'papaparse';
 
-interface CSVNode {
-  node: string;
-  type: string;
-  name: string;
-  value: string;
-  graphdepth: number;
-  'parent node': string;
-}
-
-const FlowWithCSV: React.FC = () => {
-  const [nodes, setNodes] = useState<Node[]>([]);
+const FlowWithCSV = () => {
+  const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
 
-  const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  const handleFileUpload = useCallback((event) => {
+    const file = event.target.files[0];
     if (file) {
-      Papa.parse<CSVNode>(file, {
+      Papa.parse(file, {
         header: true,
         complete: (results) => {
           const data = results.data;
-          const processedNodes: Node[] = data.map((item) => ({
+          const processedNodes = data.map((item) => ({
             id: item.node,
             type: item.type,
             data: { label: item.name, value: item.value, graphdepth: item.graphdepth, parentNode: item['parent node'] },
@@ -42,15 +33,14 @@ const FlowWithCSV: React.FC = () => {
     }
   }, []);
 
-  const calculateNodePositions = (nodes: Node[]) => {
-    const nodeMap: { [key: string]: Node } = {};
+  const calculateNodePositions = (nodes) => {
+    const nodeMap = {};
     const spacingX = 200;
     const spacingY = 100;
 
     nodes.forEach(node => {
-      const parentNode = (node.data as any).parentNode;
-      if (parentNode) {
-        const parent = nodeMap[parentNode];
+      if (node.data.parentNode) {
+        const parent = nodeMap[node.data.parentNode];
         node.position = {
           x: parent.position.x + spacingX,
           y: parent.position.y + (parent.childrenCount || 1) * spacingY,
@@ -59,7 +49,7 @@ const FlowWithCSV: React.FC = () => {
       } else {
         node.position = {
           x: 0,
-          y: ((node.data as any).graphdepth - 1) * spacingY,
+          y: (node.data.graphdepth - 1) * spacingY,
         };
       }
       nodeMap[node.id] = node;
@@ -68,14 +58,13 @@ const FlowWithCSV: React.FC = () => {
     return nodes;
   };
 
-  const generateEdges = (nodes: Node[]) => {
+  const generateEdges = (nodes) => {
     const edges = [];
     nodes.forEach(node => {
-      const parentNode = (node.data as any).parentNode;
-      if (parentNode) {
+      if (node.data.parentNode) {
         edges.push({
-          id: `e-${parentNode}-${node.id}`,
-          source: parentNode,
+          id: `e-${node.data.parentNode}-${node.id}`,
+          source: node.data.parentNode,
           target: node.id,
         });
       }
@@ -104,10 +93,13 @@ export default FlowWithCSV;
 
 
 
+
+
+App.js
 import React from 'react';
 import FlowWithCSV from './FlowWithCSV';
 
-const App: React.FC = () => {
+function App() {
   return (
     <div style={{ height: '100vh' }}>
       <FlowWithCSV />
@@ -117,35 +109,6 @@ const App: React.FC = () => {
 
 export default App;
 
-
-
-
-
-
-
-
-
-
-{
-  "compilerOptions": {
-    "target": "es5",
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": true,
-    "skipLibCheck": true,
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "strict": true,
-    "forceConsistentCasingInFileNames": true,
-    "noFallthroughCasesInSwitch": true,
-    "module": "esnext",
-    "moduleResolution": "node",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noEmit": true,
-    "jsx": "react-jsx"
-  },
-  "include": ["src"]
-}
 
 
 
