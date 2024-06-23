@@ -20,7 +20,6 @@ export default function App() {
       Papa.parse(file, {
         header: true,
         complete: (results) => {
-          console.log('Parsed CSV data:', results.data); // Debug log
           const data = results.data;
           const processedNodes = data.map((item) => ({
             id: item.node,
@@ -30,60 +29,39 @@ export default function App() {
             draggable: true, // Make nodes movable
           }));
 
-          console.log('Processed nodes:', processedNodes); // Debug log
           const positionedNodes = calculateNodePositions(processedNodes);
           setNodes(positionedNodes);
 
           // Optionally, set edges if you want to show connections
-          const generatedEdges = generateEdges(positionedNodes);
-          console.log('Generated edges:', generatedEdges); // Debug log
-          setEdges(generatedEdges);
+          setEdges(generateEdges(positionedNodes));
         },
       });
     }
   }, [setNodes, setEdges]);
 
   const calculateNodePositions = (nodes) => {
-    const nodeMap = new Map();
-    const levels = new Map();
+    const nodeMap = {};
+    const spacingX = 200;
+    const spacingY = 100;
 
-    // Initialize the root nodes (nodes without parentNode)
     nodes.forEach(node => {
-      if (!node.data.parentNode) {
-        node.position = { x: 0, y: 0 };
-        nodeMap.set(node.id, node);
-        levels.set(node.id, 0);  // Root nodes are at level 0
-      }
-    });
-
-    // Recursive function to position children nodes
-    const positionChildren = (parentId, depth, offsetX) => {
-      const children = nodes.filter(node => node.data.parentNode === parentId);
-      const spacingY = 100; // Vertical spacing between levels
-      const spacingX = 200; // Horizontal spacing between siblings
-
-      children.forEach((child, index) => {
-        const parentNode = nodeMap.get(parentId);
-        child.position = {
-          x: parentNode.position.x + (index * spacingX) - ((children.length - 1) * spacingX) / 2,
-          y: parentNode.position.y + spacingY
+      if (node.data.parentNode) {
+        const parent = nodeMap[node.data.parentNode];
+        node.position = {
+          x: parent.position.x + spacingX,
+          y: parent.position.y + (parent.childrenCount || 1) * spacingY,
         };
-        nodeMap.set(child.id, child);
-        levels.set(child.id, depth);
-
-        // Recur for the child's children
-        positionChildren(child.id, depth + 1, 0);
-      });
-    };
-
-    // Position children of root nodes
-    nodes.forEach(node => {
-      if (!node.data.parentNode) {
-        positionChildren(node.id, 1, 0);
+        parent.childrenCount = (parent.childrenCount || 0) + 1;
+      } else {
+        node.position = {
+          x: 0,
+          y: (node.data.graphdepth - 1) * spacingY,
+        };
       }
+      nodeMap[node.id] = node;
     });
 
-    return Array.from(nodeMap.values());
+    return nodes;
   };
 
   const generateEdges = (nodes) => {
