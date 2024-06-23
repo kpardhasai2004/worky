@@ -16,8 +16,7 @@ const initialNodes = [
 const initialEdges = [];
 
 const App = () => {
-  const [nodes, setNodes] = useState(initialNodes);
-  const [edges, setEdges] = useState(initialEdges);
+  const [elements, setElements] = useState([...initialNodes, ...initialEdges]);
 
   const handleFileUpload = useCallback((event) => {
     const file = event.target.files[0];
@@ -40,11 +39,9 @@ const App = () => {
             collapsed: true, // Initially collapsed
           }));
 
-          setNodes(processedNodes);
-
-          // Optionally, set edges if you want to show connections
           const processedEdges = generateEdges(processedNodes);
-          setEdges(processedEdges);
+          const updatedElements = [...processedNodes, ...processedEdges];
+          setElements(updatedElements);
         },
       });
     }
@@ -65,16 +62,16 @@ const App = () => {
   };
 
   const handleNodeClick = (nodeId) => {
-    const updatedNodes = nodes.map((node) =>
-      node.id === nodeId ? { ...node, collapsed: !node.collapsed } : node
+    const updatedElements = elements.map((el) =>
+      el.id === nodeId ? { ...el, data: { ...el.data, collapsed: !el.data.collapsed } } : el
     );
-    setNodes(updatedNodes);
+    setElements(updatedElements);
   };
 
   return (
-    <div style={{ width: '100vw', height: '100vh' }}>
+    <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
       <input type="file" accept=".csv" onChange={handleFileUpload} />
-      <ReactFlow elements={nodes.concat(edges)} onLoad={() => console.log('Flow loaded')}>
+      <ReactFlow elements={elements} onLoad={() => console.log('Flow loaded')}>
         <Controls />
         <MiniMap />
         <Background variant="dots" gap={12} size={1} />
@@ -82,11 +79,11 @@ const App = () => {
       <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 999 }}>
         <h3>Nodes:</h3>
         <ul>
-          {nodes.map((node) => (
-            <li key={node.id}>
-              {node.data.label}{' '}
-              {node.collapsed && node.data.graphdepth > 0 && (
-                <button onClick={() => handleNodeClick(node.id)}>Expand</button>
+          {elements.map((el) => (
+            <li key={el.id}>
+              {el.data.label}{' '}
+              {el.data.graphdepth > 0 && el.data.parentNode && (
+                <button onClick={() => handleNodeClick(el.id)}>Expand/Collapse</button>
               )}
             </li>
           ))}
@@ -97,4 +94,3 @@ const App = () => {
 };
 
 export default App;
-
