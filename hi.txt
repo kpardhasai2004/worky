@@ -1,1 +1,83 @@
+import React, { useState, useCallback } from 'react';
+import ReactFlow, { Controls, Background } from 'reactflow';
+import 'reactflow/dist/style.css';
+import Papa from 'papaparse';
+
+export default function App() {
+  const [nodes, setNodes] = useState([]);
+  const [edges, setEdges] = useState([]);
+
+  const handleFileUpload = useCallback((event) => {
+    const file = event.target.files[0];
+    if (file) {
+      Papa.parse(file, {
+        header: true,
+        complete: (results) => {
+          const data = results.data;
+          const processedNodes = data.map((item) => ({
+            id: item.node,
+            type: item.type || 'default',
+            data: { label: item.name, value: item.value, graphdepth: item.graphdepth, parentNode: item['parent node'] },
+            position: { x: 0, y: 0 }, // Initial positions, to be calculated
+          }));
+
+          const positionedNodes = calculateNodePositions(processedNodes);
+          setNodes(positionedNodes);
+
+          // Optionally, set edges if you want to show connections
+          setEdges(generateEdges(positionedNodes));
+        },
+      });
+    }
+  }, []);
+
+  const calculateNodePositions = (nodes) => {
+    const nodeMap = {};
+    const spacingX = 200;
+    const spacingY = 100;
+
+    nodes.forEach(node => {
+      if (node.data.parentNode) {
+        const parent = nodeMap[node.data.parentNode];
+        node.position = {
+          x: parent.position.x + spacingX,
+          y: parent.position.y + (parent.childrenCount || 1) * spacingY,
+        };
+        parent.childrenCount = (parent.childrenCount || 0) + 1;
+      } else {
+        node.position = {
+          x: 0,
+          y: (node.data.graphdepth - 1) * spacingY,
+        };
+      }
+      nodeMap[node.id] = node;
+    });
+
+    return nodes;
+  };
+
+  const generateEdges = (nodes) => {
+    const edges = [];
+    nodes.forEach(node => {
+      if (node.data.parentNode) {
+        edges.push({
+          id: `e-${node.data.parentNode}-${node.id}`,
+          source: node.data.parentNode,
+          target: node.id,
+        });
+      }
+    });
+    return edges;
+  };
+
+  return (
+    <div style={{ width: '100vw', height: '100vh' }}>
+      <input type="file" accept=".csv" onChange={handleFileUpload} />
+      <ReactFlow nodes={nodes} edges={edges}>
+        <Background />
+        <Controls />
+      </ReactFlow>
+    </div>
+  );
+}
 
