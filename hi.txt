@@ -17,8 +17,9 @@ export default function App() {
           const processedNodes = data.map((item) => ({
             id: item.node,
             type: item.type || 'default',
-            data: { label: item.name, value: item.value, graphdepth: item.graphdepth, parentNode: item['parent node'] },
+            data: { label: item.node, value: item.value, graphdepth: item.graphDepth, parentNode: item.parentNode },
             position: { x: 0, y: 0 }, // Initial positions, to be calculated
+            draggable: true, // Make nodes movable
           }));
 
           const positionedNodes = calculateNodePositions(processedNodes);
@@ -80,4 +81,3 @@ export default function App() {
     </div>
   );
 }
-
