@@ -20,6 +20,7 @@ export default function App() {
       Papa.parse(file, {
         header: true,
         complete: (results) => {
+          console.log('Parsed CSV data:', results.data); // Debug log
           const data = results.data;
           const processedNodes = data.map((item) => ({
             id: item.node,
@@ -29,11 +30,14 @@ export default function App() {
             draggable: true, // Make nodes movable
           }));
 
+          console.log('Processed nodes:', processedNodes); // Debug log
           const positionedNodes = calculateNodePositions(processedNodes);
           setNodes(positionedNodes);
 
           // Optionally, set edges if you want to show connections
-          setEdges(generateEdges(positionedNodes));
+          const generatedEdges = generateEdges(positionedNodes);
+          console.log('Generated edges:', generatedEdges); // Debug log
+          setEdges(generatedEdges);
         },
       });
     }
@@ -61,7 +65,7 @@ export default function App() {
       children.forEach((child, index) => {
         const parentNode = nodeMap[parentId];
         child.position = {
-          x: parentNode.position.x + offsetX + (index * spacingX) - ((children.length - 1) * spacingX) / 2,
+          x: parentNode.position.x + (index * spacingX) - ((children.length - 1) * spacingX) / 2,
           y: parentNode.position.y + spacingY
         };
         nodeMap[child.id] = child;
