@@ -3,9 +3,11 @@ import ReactFlow, {
   MiniMap,
   Controls,
   Background,
+  ReactFlowProvider,
   useNodesState,
   useEdgesState,
   addEdge,
+  useReactFlow,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import Papa from 'papaparse';
@@ -13,6 +15,7 @@ import Papa from 'papaparse';
 export default function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const { fitView } = useReactFlow();
 
   const handleFileUpload = useCallback((event) => {
     const file = event.target.files[0];
@@ -29,53 +32,63 @@ export default function App() {
             draggable: true, // Make nodes movable
           }));
 
-          const positionedNodes = calculateNodePositions(processedNodes);
+          const { nodes: positionedNodes, edges: generatedEdges } = getLayoutedElements(processedNodes);
           setNodes(positionedNodes);
-
-          // Optionally, set edges if you want to show connections
-          setEdges(generateEdges(positionedNodes));
+          setEdges(generatedEdges);
         },
       });
     }
   }, [setNodes, setEdges]);
 
-  const calculateNodePositions = (nodes) => {
-    const nodeMap = {};
-    const spacingX = 200;
-    const spacingY = 100;
+  const getLayoutedElements = (nodes) => {
+    const nodeMap = new Map();
+    const levels = new Map();
+    const spacingY = 100; // Vertical spacing between levels
+    const spacingX = 200; // Horizontal spacing between siblings
 
+    // Initialize the root nodes (nodes without parentNode)
     nodes.forEach(node => {
-      if (node.data.parentNode) {
-        const parent = nodeMap[node.data.parentNode];
-        node.position = {
-          x: parent.position.x + spacingX,
-          y: parent.position.y + (parent.childrenCount || 1) * spacingY,
-        };
-        parent.childrenCount = (parent.childrenCount || 0) + 1;
-      } else {
-        node.position = {
-          x: 0,
-          y: (node.data.graphdepth - 1) * spacingY,
-        };
-      }
-      nodeMap[node.id] = node;
-    });
-
-    return nodes;
-  };
-
-  const generateEdges = (nodes) => {
-    const edges = [];
-    nodes.forEach(node => {
-      if (node.data.parentNode) {
-        edges.push({
-          id: `e-${node.data.parentNode}-${node.id}`,
-          source: node.data.parentNode,
-          target: node.id,
-        });
+      if (!node.data.parentNode) {
+        node.position = { x: 0, y: 0 };
+        nodeMap.set(node.id, node);
+        levels.set(node.id, 0);  // Root nodes are at level 0
       }
     });
-    return edges;
+
+    // Recursive function to position children nodes
+    const positionChildren = (parentId, depth, offsetX) => {
+      const children = nodes.filter(node => node.data.parentNode === parentId);
+
+      children.forEach((child, index) => {
+        const parentNode = nodeMap.get(parentId);
+        child.position = {
+          x: parentNode.position.x + (index * spacingX) - ((children.length - 1) * spacingX) / 2,
+          y: parentNode.position.y + spacingY
+        };
+        nodeMap.set(child.id, child);
+        levels.set(child.id, depth);
+
+        // Recur for the child's children
+        positionChildren(child.id, depth + 1, 0);
+      });
+    };
+
+    // Position children of root nodes
+    nodes.forEach(node => {
+      if (!node.data.parentNode) {
+        positionChildren(node.id, 1, 0);
+      }
+    });
+
+    const edges = nodes
+      .filter(node => node.data.parentNode)
+      .map(node => ({
+        id: `e-${node.data.parentNode}-${node.id}`,
+        source: node.data.parentNode,
+        target: node.id,
+      }));
+
+    return { nodes: Array.from(nodeMap.values()), edges };
   };
 
   const onConnect = useCallback(
@@ -92,6 +105,7 @@ export default function App() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        fitView
       >
         <Controls />
         <MiniMap />
@@ -100,3 +114,14 @@ export default function App() {
     </div>
   );
 }
+
+function AppWrapper() {
+  return (
+    <ReactFlowProvider>
+      <App />
+    </ReactFlowProvider>
+  );
+}
+
+export default AppWrapper;
+
