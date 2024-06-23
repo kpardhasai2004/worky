@@ -3,18 +3,21 @@ import ReactFlow, {
   MiniMap,
   Controls,
   Background,
-  useNodesState,
-  useEdgesState,
+  useNodes,
+  useEdges,
   addEdge,
   useReactFlow,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import Papa from 'papaparse';
 
-export default function App() {
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const { fitView } = useReactFlow();
+const initialNodes = [];
+const initialEdges = [];
+
+const App = () => {
+  const reactFlowInstance = useReactFlow();
+  const [nodes, setNodes] = useState(initialNodes);
+  const [edges, setEdges] = useState(initialEdges);
 
   const handleFileUpload = useCallback((event) => {
     const file = event.target.files[0];
@@ -27,18 +30,20 @@ export default function App() {
             id: item.node,
             type: item.type || 'default',
             data: { label: item.node, value: item.value, graphdepth: item.graphDepth, parentNode: item.parentNode },
-            position: { x: 0, y: 0 }, // Initial positions, to be calculated
-            draggable: true, // Make nodes movable
-            collapsed: false, // Initial collapsed state
+            position: { x: 0, y: 0 },
+            draggable: true,
+            collapsed: false, // Initialize as expanded
           }));
 
-          const { nodes: positionedNodes, edges: generatedEdges } = getLayoutedElements(processedNodes);
-          setNodes(positionedNodes);
-          setEdges(generatedEdges);
+          const { nodes: updatedNodes, edges: updatedEdges } = getLayoutedElements(processedNodes);
+          setNodes(updatedNodes);
+          setEdges(updatedEdges);
+
+          reactFlowInstance.fitView(); // Adjust view to fit all nodes
         },
       });
     }
-  }, [setNodes, setEdges]);
+  }, [reactFlowInstance]);
 
   const getLayoutedElements = (nodes) => {
     const nodeMap = new Map();
@@ -46,7 +51,6 @@ export default function App() {
     const spacingY = 100; // Vertical spacing between levels
     const spacingX = 200; // Horizontal spacing between siblings
 
-    // Initialize the root nodes (nodes without parentNode)
     nodes.forEach(node => {
       if (!node.data.parentNode) {
         node.position = { x: 0, y: 0 };
@@ -55,7 +59,6 @@ export default function App() {
       }
     });
 
-    // Recursive function to position children nodes
     const positionChildren = (parentId, depth, offsetX) => {
       const children = nodes.filter(node => node.data.parentNode === parentId);
 
@@ -68,12 +71,10 @@ export default function App() {
         nodeMap.set(child.id, child);
         levels.set(child.id, depth);
 
-        // Recur for the child's children
         positionChildren(child.id, depth + 1, 0);
       });
     };
 
-    // Position children of root nodes
     nodes.forEach(node => {
       if (!node.data.parentNode) {
         positionChildren(node.id, 1, 0);
@@ -89,20 +90,6 @@ export default function App() {
       }));
 
     return { nodes: Array.from(nodeMap.values()), edges };
-  };
-
-  const generateEdges = (nodes) => {
-    const edges = [];
-    nodes.forEach(node => {
-      if (node.data.parentNode) {
-        edges.push({
-          id: `e-${node.data.parentNode}-${node.id}`,
-          source: node.data.parentNode,
-          target: node.id,
-        });
-      }
-    });
-    return edges;
   };
 
   const toggleNodeCollapse = useCallback((nodeId) => {
@@ -146,13 +133,13 @@ export default function App() {
     <div style={{ width: '100vw', height: '100vh' }}>
       <input type="file" accept=".csv" onChange={handleFileUpload} />
       <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
+        elements={nodes.concat(edges)}
+        onNodeDoubleClick={toggleNodeCollapse}
         onConnect={onConnect}
-        onNodeClick={onNodeClick}
-        fitView
+        onLoad={reactFlowInstance.fitView}
+        nodeTypes={{
+          customNode: CustomNodeComponent,
+        }}
       >
         <Controls />
         <MiniMap />
@@ -160,14 +147,6 @@ export default function App() {
       </ReactFlow>
     </div>
   );
-}
+};
 
-function AppWrapper() {
-  return (
-    <ReactFlowProvider>
-      <App />
-    </ReactFlowProvider>
-  );
-}
-
-export default AppWrapper;
+export default App;
