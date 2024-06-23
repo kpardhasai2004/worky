@@ -1,42 +1,121 @@
-const calculateNodePositions = (nodes) => {
-  const nodeMap = {};
-  const levels = {};
+import React, { useState, useCallback } from 'react';
+import ReactFlow, {
+  MiniMap,
+  Controls,
+  Background,
+  useNodesState,
+  useEdgesState,
+  addEdge,
+} from 'reactflow';
+import 'reactflow/dist/style.css';
+import Papa from 'papaparse';
 
-  // Initialize the root nodes (nodes without parentNode)
-  nodes.forEach(node => {
-    if (!node.data.parentNode) {
-      node.position = { x: 0, y: 0 };
-      nodeMap[node.id] = node;
-      levels[node.id] = 0;  // Root nodes are at level 0
+export default function App() {
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+
+  const handleFileUpload = useCallback((event) => {
+    const file = event.target.files[0];
+    if (file) {
+      Papa.parse(file, {
+        header: true,
+        complete: (results) => {
+          const data = results.data;
+          const processedNodes = data.map((item) => ({
+            id: item.node,
+            type: item.type || 'default',
+            data: { label: item.node, value: item.value, graphdepth: item.graphDepth, parentNode: item.parentNode },
+            position: { x: 0, y: 0 }, // Initial positions, to be calculated
+            draggable: true, // Make nodes movable
+          }));
+
+          const positionedNodes = calculateNodePositions(processedNodes);
+          setNodes(positionedNodes);
+
+          // Optionally, set edges if you want to show connections
+          setEdges(generateEdges(positionedNodes));
+        },
+      });
     }
-  });
+  }, [setNodes, setEdges]);
 
-  // Recursive function to position children nodes
-  const positionChildren = (parentId, depth, offsetX) => {
-    const children = nodes.filter(node => node.data.parentNode === parentId);
-    const spacingY = 100; // Vertical spacing between levels
-    const spacingX = 200; // Horizontal spacing between siblings
+  const calculateNodePositions = (nodes) => {
+    const nodeMap = {};
+    const levels = {};
 
-    children.forEach((child, index) => {
-      const parentNode = nodeMap[parentId];
-      child.position = {
-        x: parentNode.position.x + offsetX + (index * spacingX) - ((children.length - 1) * spacingX) / 2,
-        y: parentNode.position.y + spacingY
-      };
-      nodeMap[child.id] = child;
-      levels[child.id] = depth;
-
-      // Recur for the child's children
-      positionChildren(child.id, depth + 1, 0);
+    // Initialize the root nodes (nodes without parentNode)
+    nodes.forEach(node => {
+      if (!node.data.parentNode) {
+        node.position = { x: 0, y: 0 };
+        nodeMap[node.id] = node;
+        levels[node.id] = 0;  // Root nodes are at level 0
+      }
     });
+
+    // Recursive function to position children nodes
+    const positionChildren = (parentId, depth, offsetX) => {
+      const children = nodes.filter(node => node.data.parentNode === parentId);
+      const spacingY = 100; // Vertical spacing between levels
+      const spacingX = 200; // Horizontal spacing between siblings
+
+      children.forEach((child, index) => {
+        const parentNode = nodeMap[parentId];
+        child.position = {
+          x: parentNode.position.x + offsetX + (index * spacingX) - ((children.length - 1) * spacingX) / 2,
+          y: parentNode.position.y + spacingY
+        };
+        nodeMap[child.id] = child;
+        levels[child.id] = depth;
+
+        // Recur for the child's children
+        positionChildren(child.id, depth + 1, 0);
+      });
+    };
+
+    // Position children of root nodes
+    nodes.forEach(node => {
+      if (!node.data.parentNode) {
+        positionChildren(node.id, 1, 0);
+      }
+    });
+
+    return nodes;
   };
 
-  // Position children of root nodes
-  nodes.forEach(node => {
-    if (!node.data.parentNode) {
-      positionChildren(node.id, 1, 0);
-    }
-  });
+  const generateEdges = (nodes) => {
+    const edges = [];
+    nodes.forEach(node => {
+      if (node.data.parentNode) {
+        edges.push({
+          id: `e-${node.data.parentNode}-${node.id}`,
+          source: node.data.parentNode,
+          target: node.id,
+        });
+      }
+    });
+    return edges;
+  };
 
-  return nodes;
-};
+  const onConnect = useCallback(
+    (params) => setEdges((eds) => addEdge(params, eds)),
+    [setEdges],
+  );
+
+  return (
+    <div style={{ width: '100vw', height: '100vh' }}>
+      <input type="file" accept=".csv" onChange={handleFileUpload} />
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+      >
+        <Controls />
+        <MiniMap />
+        <Background variant="dots" gap={12} size={1} />
+      </ReactFlow>
+    </div>
+  );
+}
+
