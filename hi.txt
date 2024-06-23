@@ -1,40 +1,23 @@
-// src/store.js
-import create from 'zustand';
-
-const useStore = create((set) => ({
-  nodes: [],
-  edges: [],
-  setNodes: (nodes) => set({ nodes }),
-  setEdges: (edges) => set({ edges }),
-}));
-
-export default useStore;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// src/App.jsx
-import React, { useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import ReactFlow, { MiniMap, Controls, Background, addEdge } from 'react-flow';
 import Papa from 'papaparse';
-import useStore from './store';
+
+const initialNodes = [
+  {
+    id: 'root',
+    type: 'default',
+    data: { label: 'Root', value: 'Root Node', graphdepth: 0, parentNode: null },
+    position: { x: 0, y: 0 },
+    draggable: true,
+    collapsed: false,
+  },
+];
+
+const initialEdges = [];
 
 const App = () => {
-  const { nodes, setNodes, edges, setEdges } = useStore();
+  const [nodes, setNodes] = useState(initialNodes);
+  const [edges, setEdges] = useState(initialEdges);
 
   const handleFileUpload = useCallback((event) => {
     const file = event.target.files[0];
@@ -46,82 +29,72 @@ const App = () => {
           const processedNodes = data.map((item) => ({
             id: item.node,
             type: item.type || 'default',
-            data: { label: item.node, value: item.value, graphdepth: item.graphDepth, parentNode: item.parentNode },
+            data: {
+              label: item.node,
+              value: item.value,
+              graphdepth: parseInt(item.graphDepth),
+              parentNode: item.parentNode,
+            },
             position: { x: 0, y: 0 },
             draggable: true,
-            collapsed: false,
+            collapsed: true, // Initially collapsed
           }));
 
-          const { nodes: updatedNodes, edges: updatedEdges } = getLayoutedElements(processedNodes);
-          setNodes(updatedNodes);
-          setEdges(updatedEdges);
+          setNodes(processedNodes);
+
+          // Optionally, set edges if you want to show connections
+          const processedEdges = generateEdges(processedNodes);
+          setEdges(processedEdges);
         },
       });
     }
-  }, [setNodes, setEdges]);
+  }, []);
 
-  const getLayoutedElements = (nodes) => {
-    // Simplified example for node positioning and edge generation
-    const updatedEdges = nodes.map((node, index) => ({
-      id: `e${index}`,
-      source: 'sourceNodeId',
-      target: node.id,
-    }));
-
-    return { nodes, edges: updatedEdges };
+  const generateEdges = (nodes) => {
+    const edges = [];
+    nodes.forEach((node) => {
+      if (node.data.parentNode) {
+        edges.push({
+          id: `e-${node.data.parentNode}-${node.id}`,
+          source: node.data.parentNode,
+          target: node.id,
+        });
+      }
+    });
+    return edges;
   };
 
-  const onConnect = useCallback(
-    (params) => setEdges((eds) => addEdge(params, eds)),
-    [setEdges],
-  );
+  const handleNodeClick = (nodeId) => {
+    const updatedNodes = nodes.map((node) =>
+      node.id === nodeId ? { ...node, collapsed: !node.collapsed } : node
+    );
+    setNodes(updatedNodes);
+  };
 
   return (
     <div style={{ width: '100vw', height: '100vh' }}>
       <input type="file" accept=".csv" onChange={handleFileUpload} />
-      <ReactFlow
-        elements={nodes.concat(edges)}
-        onConnect={onConnect}
-      >
+      <ReactFlow elements={nodes.concat(edges)} onLoad={() => console.log('Flow loaded')}>
         <Controls />
         <MiniMap />
-        <Background />
+        <Background variant="dots" gap={12} size={1} />
       </ReactFlow>
+      <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 999 }}>
+        <h3>Nodes:</h3>
+        <ul>
+          {nodes.map((node) => (
+            <li key={node.id}>
+              {node.data.label}{' '}
+              {node.collapsed && node.data.graphdepth > 0 && (
+                <button onClick={() => handleNodeClick(node.id)}>Expand</button>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 };
 
 export default App;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// src/index.js (or wherever your main entry point is)
-import React from 'react';
-import ReactDOM from 'react-dom';
-import App from './App';
-import useStore from './store'; // Import the Zustand store
-
-// Wrap your App component with the Zustand provider
-const Root = () => (
-  <useStore.Provider>
-    <App />
-  </useStore.Provider>
-);
-
-ReactDOM.render(<Root />, document.getElementById('root'));
