@@ -3,7 +3,6 @@ import ReactFlow, {
   MiniMap,
   Controls,
   Background,
-  ReactFlowProvider,
   useNodesState,
   useEdgesState,
   addEdge,
@@ -30,6 +29,7 @@ export default function App() {
             data: { label: item.node, value: item.value, graphdepth: item.graphDepth, parentNode: item.parentNode },
             position: { x: 0, y: 0 }, // Initial positions, to be calculated
             draggable: true, // Make nodes movable
+            collapsed: false, // Initial collapsed state
           }));
 
           const { nodes: positionedNodes, edges: generatedEdges } = getLayoutedElements(processedNodes);
@@ -91,6 +91,52 @@ export default function App() {
     return { nodes: Array.from(nodeMap.values()), edges };
   };
 
+  const generateEdges = (nodes) => {
+    const edges = [];
+    nodes.forEach(node => {
+      if (node.data.parentNode) {
+        edges.push({
+          id: `e-${node.data.parentNode}-${node.id}`,
+          source: node.data.parentNode,
+          target: node.id,
+        });
+      }
+    });
+    return edges;
+  };
+
+  const toggleNodeCollapse = useCallback((nodeId) => {
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.id === nodeId) {
+          node.data.collapsed = !node.data.collapsed;
+        }
+        return node;
+      })
+    );
+
+    setNodes((nds) => {
+      const updatedNodes = nds.map((node) => {
+        if (node.data.parentNode && isParentCollapsed(nds, node.data.parentNode)) {
+          node.hidden = true;
+        } else {
+          node.hidden = false;
+        }
+        return node;
+      });
+      return updatedNodes;
+    });
+  }, []);
+
+  const isParentCollapsed = (nodes, parentId) => {
+    const parent = nodes.find((node) => node.id === parentId);
+    return parent ? parent.data.collapsed || (parent.data.parentNode && isParentCollapsed(nodes, parent.data.parentNode)) : false;
+  };
+
+  const onNodeClick = useCallback((event, node) => {
+    toggleNodeCollapse(node.id);
+  }, [toggleNodeCollapse]);
+
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
     [setEdges],
@@ -105,6 +151,7 @@ export default function App() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeClick={onNodeClick}
         fitView
       >
         <Controls />
@@ -124,4 +171,3 @@ function AppWrapper() {
 }
 
 export default AppWrapper;
-
