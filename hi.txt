@@ -44,15 +44,15 @@ export default function App() {
   }, [setNodes, setEdges]);
 
   const calculateNodePositions = (nodes) => {
-    const nodeMap = {};
-    const levels = {};
+    const nodeMap = new Map();
+    const levels = new Map();
 
     // Initialize the root nodes (nodes without parentNode)
     nodes.forEach(node => {
       if (!node.data.parentNode) {
         node.position = { x: 0, y: 0 };
-        nodeMap[node.id] = node;
-        levels[node.id] = 0;  // Root nodes are at level 0
+        nodeMap.set(node.id, node);
+        levels.set(node.id, 0);  // Root nodes are at level 0
       }
     });
 
@@ -63,13 +63,13 @@ export default function App() {
       const spacingX = 200; // Horizontal spacing between siblings
 
       children.forEach((child, index) => {
-        const parentNode = nodeMap[parentId];
+        const parentNode = nodeMap.get(parentId);
         child.position = {
           x: parentNode.position.x + (index * spacingX) - ((children.length - 1) * spacingX) / 2,
           y: parentNode.position.y + spacingY
         };
-        nodeMap[child.id] = child;
-        levels[child.id] = depth;
+        nodeMap.set(child.id, child);
+        levels.set(child.id, depth);
 
         // Recur for the child's children
         positionChildren(child.id, depth + 1, 0);
@@ -83,7 +83,7 @@ export default function App() {
       }
     });
 
-    return nodes;
+    return Array.from(nodeMap.values());
   };
 
   const generateEdges = (nodes) => {
@@ -122,4 +122,3 @@ export default function App() {
     </div>
   );
 }
-
