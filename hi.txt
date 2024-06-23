@@ -1,11 +1,18 @@
 import React, { useState, useCallback } from 'react';
-import ReactFlow, { Controls, Background } from 'reactflow';
+import ReactFlow, {
+  MiniMap,
+  Controls,
+  Background,
+  useNodesState,
+  useEdgesState,
+  addEdge,
+} from 'reactflow';
 import 'reactflow/dist/style.css';
 import Papa from 'papaparse';
 
 export default function App() {
-  const [nodes, setNodes] = useState([]);
-  const [edges, setEdges] = useState([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
   const handleFileUpload = useCallback((event) => {
     const file = event.target.files[0];
@@ -30,7 +37,7 @@ export default function App() {
         },
       });
     }
-  }, []);
+  }, [setNodes, setEdges]);
 
   const calculateNodePositions = (nodes) => {
     const nodeMap = {};
@@ -71,12 +78,24 @@ export default function App() {
     return edges;
   };
 
+  const onConnect = useCallback(
+    (params) => setEdges((eds) => addEdge(params, eds)),
+    [setEdges],
+  );
+
   return (
     <div style={{ width: '100vw', height: '100vh' }}>
       <input type="file" accept=".csv" onChange={handleFileUpload} />
-      <ReactFlow nodes={nodes} edges={edges}>
-        <Background />
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+      >
         <Controls />
+        <MiniMap />
+        <Background variant="dots" gap={12} size={1} />
       </ReactFlow>
     </div>
   );
