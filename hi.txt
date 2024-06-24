@@ -7,46 +7,58 @@ import ReactFlow, {
   useNodesState,
   useEdgesState,
   ReactFlowProvider,
+  Node,
+  Edge,
+  Connection,
+  NodeMouseHandler,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import Papa from 'papaparse';
 
-const initialNodes = [];
+interface NodeData {
+  node: string;
+  type?: string;
+  value?: string;
+  graphDepth: number;
+  parentNode?: string | null;
+}
 
-const initialEdges = [];
+const initialNodes: Node[] = [];
 
-const App = () => {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  const [allNodes, setAllNodes] = useState([]);
-  const [allEdges, setAllEdges] = useState([]);
+const initialEdges: Edge[] = [];
 
-  const handleFileUpload = useCallback((event) => {
-    const file = event.target.files[0];
+const App: React.FC = () => {
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
+  const [allNodes, setAllNodes] = useState<Node[]>([]);
+  const [allEdges, setAllEdges] = useState<Edge[]>([]);
+
+  const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (file) {
-      Papa.parse(file, {
+      Papa.parse<NodeData>(file, {
         header: true,
         complete: (results) => {
           const data = results.data;
-          const processedNodes = data.map((item) => ({
+          const processedNodes: Node[] = data.map((item) => ({
             id: item.node,
             type: item.type || 'default',
             data: {
               label: item.node,
               value: item.value,
-              graphdepth: parseInt(item.graphDepth),
+              graphdepth: parseInt(item.graphDepth.toString(), 10),
               parentNode: item.parentNode,
             },
             position: { x: 0, y: 0 },
             draggable: true,
-            collapsed: true,
+            hidden: true,
           }));
 
-          const processedEdges = data
+          const processedEdges: Edge[] = data
             .filter((item) => item.parentNode)
             .map((item) => ({
               id: `e-${item.parentNode}-${item.node}`,
-              source: item.parentNode,
+              source: item.parentNode as string,
               target: item.node,
             }));
 
@@ -55,25 +67,25 @@ const App = () => {
 
           // Set the first node (root node) as the initial node
           if (processedNodes.length > 0) {
-            setNodes([processedNodes[0]]);
+            setNodes([{ ...processedNodes[0], hidden: false }]);
           }
         },
       });
     }
-  }, []);
+  }, [setNodes]);
 
-  const generateEdges = useCallback((nodeId) => {
+  const generateEdges = useCallback((nodeId: string) => {
     const newEdges = allNodes
       .filter(node => node.data.parentNode === nodeId)
       .map(node => ({
         id: `e-${node.data.parentNode}-${node.id}`,
-        source: node.data.parentNode,
+        source: node.data.parentNode as string,
         target: node.id,
       }));
     setEdges(prevEdges => [...prevEdges, ...newEdges]);
   }, [allNodes, setEdges]);
 
-  const onNodeClick = useCallback((event, node) => {
+  const onNodeClick: NodeMouseHandler = useCallback((event, node) => {
     if (node.data.collapsed) {
       const childNodes = allNodes.filter(n => n.data.parentNode === node.id);
       childNodes.forEach(child => {
@@ -81,6 +93,7 @@ const App = () => {
           x: node.position.x + 200,
           y: node.position.y + 100 * childNodes.indexOf(child),
         };
+        child.hidden = false;
       });
       setNodes(prevNodes => [...prevNodes, ...childNodes]);
       generateEdges(node.id);
@@ -93,7 +106,7 @@ const App = () => {
   }, [allNodes, generateEdges]);
 
   const onConnect = useCallback(
-    (params) => setEdges((eds) => addEdge(params, eds)),
+    (params: Edge | Connection) => setEdges((eds) => addEdge(params, eds)),
     [setEdges]
   );
 
@@ -117,8 +130,10 @@ const App = () => {
   );
 };
 
-export default () => (
+const WrappedApp: React.FC = () => (
   <ReactFlowProvider>
     <App />
   </ReactFlowProvider>
 );
+
+export default WrappedApp;
