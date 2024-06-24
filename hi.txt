@@ -6,7 +6,7 @@ import ReactFlow, {
   addEdge,
   useNodesState,
   useEdgesState,
-  ReactFlowProvider
+  ReactFlowProvider,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import Papa from 'papaparse';
@@ -18,7 +18,7 @@ const initialNodes = [
     data: { label: 'Root', value: 'Root Node', graphdepth: 0, parentNode: null },
     position: { x: 250, y: 25 },
     draggable: true,
-    collapsed: false,
+    collapsed: true,
   },
 ];
 
@@ -27,6 +27,8 @@ const initialEdges = [];
 const App = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [allNodes, setAllNodes] = useState([]);
+  const [allEdges, setAllEdges] = useState([]);
 
   const handleFileUpload = useCallback((event) => {
     const file = event.target.files[0];
@@ -41,7 +43,7 @@ const App = () => {
             data: {
               label: item.node,
               value: item.value,
-              graphdepth: parseInt(item.graphDepth),
+              graphdepth: parseInt(item.graphDepth, 10),
               parentNode: item.parentNode,
             },
             position: { x: 0, y: 0 },
@@ -49,32 +51,38 @@ const App = () => {
             collapsed: true,
           }));
 
-          setNodes([...initialNodes, ...processedNodes]);
+          const processedEdges = data
+            .filter((item) => item.parentNode)
+            .map((item) => ({
+              id: `e-${item.parentNode}-${item.node}`,
+              source: item.parentNode,
+              target: item.node,
+            }));
+
+          setAllNodes(processedNodes);
+          setAllEdges(processedEdges);
         },
       });
     }
-  }, [setNodes]);
+  }, []);
 
-  const generateEdges = useCallback((nodeId) => {
-    const newEdges = nodes
-      .filter(node => node.data.parentNode === nodeId)
-      .map(node => ({
-        id: `e-${node.data.parentNode}-${node.id}`,
-        source: node.data.parentNode,
-        target: node.id,
-      }));
-    setEdges(prevEdges => [...prevEdges, ...newEdges]);
-  }, [nodes, setEdges]);
+  const generateEdgesAndNodes = useCallback((nodeId) => {
+    const newNodes = allNodes.filter((node) => node.data.parentNode === nodeId && node.data.collapsed);
+    const newEdges = allEdges.filter((edge) => edge.source === nodeId);
+
+    setNodes((prevNodes) =>
+      prevNodes.map((n) =>
+        n.id === nodeId ? { ...n, data: { ...n.data, collapsed: false } } : n
+      ).concat(newNodes)
+    );
+
+    setEdges((prevEdges) => prevEdges.concat(newEdges));
+  }, [allNodes, allEdges]);
 
   const onNodeClick = (event, node) => {
     if (node.data.collapsed) {
-      generateEdges(node.id);
+      generateEdgesAndNodes(node.id);
     }
-    setNodes(prevNodes =>
-      prevNodes.map(n =>
-        n.id === node.id ? { ...n, data: { ...n.data, collapsed: !n.data.collapsed } } : n
-      )
-    );
   };
 
   const onConnect = useCallback(
@@ -92,6 +100,7 @@ const App = () => {
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
         onConnect={onConnect}
+        fitView
       >
         <Controls />
         <MiniMap />
