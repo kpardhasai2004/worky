@@ -3,9 +3,9 @@ import ReactFlow, {
   MiniMap,
   Controls,
   Background,
-  addEdge,
   useNodesState,
   useEdgesState,
+  addEdge,
   ReactFlowProvider,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
@@ -15,9 +15,10 @@ const initialNodes = [
   {
     id: 'root',
     type: 'default',
-    data: { label: 'Root', value: 'Root Node', graphdepth: 0, parentNode: null, collapsed: true },
+    data: { label: 'Root', value: 'Root Node', graphdepth: 0, parentNode: null },
     position: { x: 250, y: 25 },
     draggable: true,
+    isHidden: false,
   },
 ];
 
@@ -44,10 +45,10 @@ const App = () => {
               value: item.value,
               graphdepth: parseInt(item.graphDepth, 10),
               parentNode: item.parentNode,
-              collapsed: true,
             },
-            position: { x: 0, y: 0 },
+            position: { x: 0, y: 0 }, // Initial positions, to be calculated
             draggable: true,
+            isHidden: true, // All nodes hidden initially
           }));
 
           const processedEdges = data
@@ -56,37 +57,37 @@ const App = () => {
               id: `e-${item.parentNode}-${item.node}`,
               source: item.parentNode,
               target: item.node,
+              isHidden: true, // All edges hidden initially
             }));
 
           console.log('Processed Nodes:', processedNodes);
           console.log('Processed Edges:', processedEdges);
 
-          setAllNodes(processedNodes);
+          // Set all nodes and edges, including the root node initially
+          setAllNodes([initialNodes[0], ...processedNodes]);
           setAllEdges(processedEdges);
+          setNodes([initialNodes[0]]);
         },
       });
     }
   }, []);
 
-  const generateEdgesAndNodes = useCallback((nodeId) => {
-    const newNodes = allNodes.filter((node) => node.data.parentNode === nodeId && node.data.collapsed);
-    const newEdges = allEdges.filter((edge) => edge.source === nodeId);
-
-    setNodes((prevNodes) =>
-      prevNodes.map((n) =>
-        n.id === nodeId ? { ...n, data: { ...n.data, collapsed: false } } : n
-      ).concat(newNodes)
+  const revealChildren = useCallback((nodeId) => {
+    const newNodes = allNodes.map((node) =>
+      node.data.parentNode === nodeId ? { ...node, isHidden: false } : node
+    );
+    const newEdges = allEdges.map((edge) =>
+      edge.source === nodeId ? { ...edge, isHidden: false } : edge
     );
 
-    setEdges((prevEdges) => prevEdges.concat(newEdges));
+    setNodes(newNodes);
+    setEdges(newEdges);
   }, [allNodes, allEdges, setNodes, setEdges]);
 
   const onNodeClick = useCallback((event, node) => {
     console.log('Node Clicked:', node);
-    if (node.data.collapsed) {
-      generateEdgesAndNodes(node.id);
-    }
-  }, [generateEdgesAndNodes]);
+    revealChildren(node.id);
+  }, [revealChildren]);
 
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
@@ -97,8 +98,8 @@ const App = () => {
     <div style={{ width: '100vw', height: '100vh' }}>
       <input type="file" accept=".csv" onChange={handleFileUpload} />
       <ReactFlow
-        nodes={nodes}
-        edges={edges}
+        nodes={nodes.filter((node) => !node.isHidden)}
+        edges={edges.filter((edge) => !edge.isHidden)}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
