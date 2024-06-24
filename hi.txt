@@ -15,10 +15,9 @@ const initialNodes = [
   {
     id: 'root',
     type: 'default',
-    data: { label: 'Root', value: 'Root Node', graphdepth: 0, parentNode: null },
+    data: { label: 'Root', value: 'Root Node', graphdepth: 0, parentNode: null, collapsed: true },
     position: { x: 250, y: 25 },
     draggable: true,
-    collapsed: true,
   },
 ];
 
@@ -45,10 +44,10 @@ const App = () => {
               value: item.value,
               graphdepth: parseInt(item.graphDepth, 10),
               parentNode: item.parentNode,
+              collapsed: true,
             },
             position: { x: 0, y: 0 },
             draggable: true,
-            collapsed: true,
           }));
 
           const processedEdges = data
@@ -58,6 +57,9 @@ const App = () => {
               source: item.parentNode,
               target: item.node,
             }));
+
+          console.log('Processed Nodes:', processedNodes);
+          console.log('Processed Edges:', processedEdges);
 
           setAllNodes(processedNodes);
           setAllEdges(processedEdges);
@@ -77,13 +79,14 @@ const App = () => {
     );
 
     setEdges((prevEdges) => prevEdges.concat(newEdges));
-  }, [allNodes, allEdges]);
+  }, [allNodes, allEdges, setNodes, setEdges]);
 
-  const onNodeClick = (event, node) => {
+  const onNodeClick = useCallback((event, node) => {
+    console.log('Node Clicked:', node);
     if (node.data.collapsed) {
       generateEdgesAndNodes(node.id);
     }
-  };
+  }, [generateEdgesAndNodes]);
 
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
