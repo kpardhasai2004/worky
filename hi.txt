@@ -1,235 +1,140 @@
-// HierarchicalGraph.tsx
-import React, { useState, useEffect } from 'react';
-import ReactFlow, { MiniMap, Controls, Background, useNodesState, useEdgesState, Node, Edge, useReactFlow } from 'reactflow';
-import 'reactflow/dist/style.css';
-import { NodeData, Hierarchy, NodeStyle } from './types';
+import React, { useState, useCallback } from 'react';
+import ReactFlow, {
+  MiniMap,
+  Controls,
+  Background,
+  addEdge,
+  useNodesState,
+  useEdgesState,
+  ReactFlowProvider,
+  Elements,
+  Connection,
+  Edge as FlowEdge,
+  Node as FlowNode,
+  OnLoadParams,
+} from 'react-flow-renderer';
+import 'react-flow-renderer/dist/style.css';
+import Papa from 'papaparse';
 
-interface HierarchicalGraphProps {
-  data: NodeData;
-  sliderValue: number;
+interface NodeData {
+  node: string;
+  type?: string;
+  value?: string;
+  graphDepth: number;
+  parentNode?: string | null;
 }
 
-const parseData = (data: NodeData): Hierarchy => {
-  const hierarchy: Hierarchy = {};
+const initialNodes: Elements = [];
 
-  const traverse = (node: NodeData) => {
-    hierarchy[node.id] = node;
-    if (node.children) {
-      node.children.forEach(traverse);
-    }
-  };
+const initialEdges: FlowEdge[] = [];
 
-  traverse(data);
-  return hierarchy;
-};
+const App: React.FC = () => {
+  const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>(initialEdges);
+  const [allNodes, setAllNodes] = useState<FlowNode[]>([]);
+  const [allEdges, setAllEdges] = useState<FlowEdge[]>([]);
 
-const getNodeColor = (type: string): string => {
-  return type === 'root' ? 'lightblue' : 'lightgreen';
-};
+  const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      Papa.parse<NodeData>(file, {
+        header: true,
+        complete: (results) => {
+          const data = results.data;
+          const processedNodes: FlowNode[] = data.map((item) => ({
+            id: item.node,
+            type: item.type || 'default',
+            data: {
+              label: item.node,
+              value: item.value,
+              graphdepth: parseInt(item.graphDepth.toString(), 10),
+              parentNode: item.parentNode,
+            },
+            position: { x: 0, y: 0 },
+            draggable: true,
+            hidden: true,
+          }));
 
-const getLayoutedElements = (nodes: Node[], edges: Edge[], direction: string) => {
-  // Implement your layout logic here
-  return { nodes, edges };
-};
+          const processedEdges: FlowEdge[] = data
+            .filter((item) => item.parentNode)
+            .map((item) => ({
+              id: `e-${item.parentNode}-${item.node}`,
+              source: item.parentNode as string,
+              target: item.node,
+            }));
 
-const HierarchicalGraph: React.FC<HierarchicalGraphProps> = ({ data, sliderValue }) => {
-  const hierarchy: Hierarchy = parseData(data);
-  const [selectedParentNode, setSelectedParentNode] = useState<string>('<SCLRootCalcNode>');
-  const initialElements: Node[] = [
-    {
-      id: hierarchy[selectedParentNode].id,
-      type: hierarchy[selectedParentNode].type,
-      data: { label: hierarchy[selectedParentNode].label },
-      position: { x: 0, y: 0 },
-      style: { backgroundColor: getNodeColor(hierarchy[selectedParentNode].type) } as NodeStyle,
-    },
-  ];
+          setAllNodes(processedNodes);
+          setAllEdges(processedEdges);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(initialElements);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
-  const [direction, setDirection] = useState<string>('TB');
-
-  const { project } = useReactFlow();
-
-  const expandNode = (node: Node) => {
-    if (!hierarchy[node.id] || !hierarchy[node.id].children || hierarchy[node.id].children.length === 0) {
-      return;
-    }
-
-    const currentExpandedNodes = new Set(expandedNodes);
-
-    if (currentExpandedNodes.has(node.id)) {
-      // Collapse the node
-      currentExpandedNodes.delete(node.id);
-      const nodesToKeep = nodes.filter((n) => !hierarchy[node.id].children!.some((child) => child.id === n.id));
-      const edgesToKeep = edges.filter((e) => !hierarchy[node.id].children!.some((child) => e.source === node.id && e.target === child.id));
-      setNodes(nodesToKeep);
-      setEdges(edgesToKeep);
-    } else {
-      // Expand the node
-      currentExpandedNodes.add(node.id);
-
-      const newNodes = [...nodes];
-      const newEdges = [...edges];
-
-      hierarchy[node.id].children!.forEach((child) => {
-        const position = project({ x: node.position.x + (Math.random() - 0.5) * 200, y: node.position.y + 100 });
-        newNodes.push({
-          id: child.id,
-          data: { label: child.label },
-          position,
-          style: { backgroundColor: getNodeColor(child.type) },
-        });
-
-        newEdges.push({
-          id: `${node.id}-${child.id}`,
-          source: node.id,
-          target: child.id,
-          type: 'smoothstep',
-          animated: true,
-        });
-
-        if (currentExpandedNodes.has(child.id)) {
-          expandNode(child);
-        }
-      });
-
-      setNodes(newNodes);
-      setEdges(newEdges);
-    }
-
-    setExpandedNodes(currentExpandedNodes);
-  };
-
-  useEffect(() => {
-    const layoutedElements = getLayoutedElements(nodes, edges, direction);
-    setNodes(layoutedElements.nodes);
-    setEdges(layoutedElements.edges);
-  }, [nodes.length, edges.length, sliderValue, direction]);
-
-  useEffect(() => {
-    const selectedNode = hierarchy[selectedParentNode];
-    if (selectedNode) {
-      const initialElements: Node[] = [
-        {
-          id: selectedNode.id,
-          type: selectedNode.type,
-          data: { label: selectedNode.label },
-          position: { x: 0, y: 0 },
-          style: { backgroundColor: getNodeColor(selectedNode.type) } as NodeStyle,
+          // Set the first node (root node) as the initial node
+          if (processedNodes.length > 0) {
+            setNodes([{ ...processedNodes[0], hidden: false }]);
+          }
         },
-      ];
-      setNodes(initialElements);
-      setEdges([]);
-      setExpandedNodes(new Set());
+      });
     }
-  }, [selectedParentNode]);
+  }, [setNodes]);
+
+  const generateEdges = useCallback((nodeId: string) => {
+    const newEdges = allNodes
+      .filter(node => node.data.parentNode === nodeId)
+      .map(node => ({
+        id: `e-${node.data.parentNode}-${node.id}`,
+        source: node.data.parentNode as string,
+        target: node.id,
+      }));
+    setEdges(prevEdges => [...prevEdges, ...newEdges]);
+  }, [allNodes, setEdges]);
+
+  const onNodeClick = useCallback((event, node) => {
+    if (node.data.collapsed) {
+      const childNodes = allNodes.filter(n => n.data.parentNode === node.id);
+      childNodes.forEach(child => {
+        child.position = {
+          x: node.position.x + 200,
+          y: node.position.y + 100 * childNodes.indexOf(child),
+        };
+        child.hidden = false;
+      });
+      setNodes(prevNodes => [...prevNodes, ...childNodes]);
+      generateEdges(node.id);
+    }
+    setNodes(prevNodes =>
+      prevNodes.map(n =>
+        n.id === node.id ? { ...n, data: { ...n.data, collapsed: !n.data.collapsed } } : n
+      )
+    );
+  }, [allNodes, generateEdges]);
+
+  const onConnect = useCallback(
+    (params: FlowEdge | Connection) => setEdges((eds) => addEdge(params, eds)),
+    [setEdges]
+  );
 
   return (
-    <div className="graph-container">
-      <div className="controls">
-        <label>
-          Direction:
-          <select value={direction} onChange={(e) => setDirection(e.target.value)} style={{ marginLeft: '10px' }}>
-            <option value="TB">Top-Bottom</option>
-            <option value="BT">Bottom-Top</option>
-            <option value="LR">Left-Right</option>
-            <option value="RL">Right-Left</option>
-          </select>
-        </label>
-        <label style={{ marginLeft: '20px' }}>
-          Parent Node:
-          <select
-            value={selectedParentNode}
-            onChange={(e) => setSelectedParentNode(e.target.value)}
-            style={{ marginLeft: '10px' }}
-          >
-            {Object.keys(hierarchy).map((key) => (
-              <option key={key} value={key}>
-                {hierarchy[key].label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+    <div style={{ width: '100vw', height: '100vh' }}>
+      <input type="file" accept=".csv" onChange={handleFileUpload} />
       <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        fitView
-        onNodeClick={(event, node) => expandNode(node)}
+        elements={[...nodes, ...edges]}
+        onElementsRemove={(elementsToRemove) => setNodes((nds) => nds.filter((n) => !elementsToRemove.includes(n)))}
+        onConnect={onConnect}
+        onLoad={(reactFlowInstance: OnLoadParams) => reactFlowInstance.fitView()}
+        onNodeClick={onNodeClick}
+        snapToGrid
+        snapGrid={[15, 15]}
       >
-        <MiniMap />
         <Controls />
-        <Background />
+        <MiniMap />
+        <Background variant="dots" gap={12} size={1} />
       </ReactFlow>
     </div>
   );
 };
 
-export default HierarchicalGraph;
+const WrappedApp: React.FC = () => (
+  <ReactFlowProvider>
+    <App />
+  </ReactFlowProvider>
+);
 
-
-
-
-
-
-
-// App.tsx
-import React, { useState } from 'react';
-import HierarchicalGraph from './HierarchicalGraph';
-import { NodeData } from './types';
-
-// Dummy data for testing
-const dummyData: NodeData = {
-  id: '<SCLRootCalcNode>',
-  type: 'root',
-  label: 'Root Node',
-  children: [
-    {
-      id: 'child1',
-      type: 'child',
-      label: 'Child Node 1',
-      children: [
-        {
-          id: 'grandchild1',
-          type: 'grandchild',
-          label: 'Grandchild Node 1',
-        },
-      ],
-    },
-    {
-      id: 'child2',
-      type: 'child',
-      label: 'Child Node 2',
-      children: [
-        {
-          id: 'grandchild2',
-          type: 'grandchild',
-          label: 'Grandchild Node 2',
-        },
-      ],
-    },
-  ],
-};
-
-const App: React.FC = () => {
-  const [sliderValue, setSliderValue] = useState<number>(50);
-
-  return (
-    <div>
-      <input
-        type="range"
-        min="0"
-        max="100"
-        value={sliderValue}
-        onChange={(e) => setSliderValue(Number(e.target.value))}
-      />
-      <HierarchicalGraph data={dummyData} sliderValue={sliderValue} />
-    </div>
-  );
-};
-
-export default App;
+export default WrappedApp;
