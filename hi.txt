@@ -1,148 +1,124 @@
-import panel as pn
-import plotly.graph_objects as go
-import networkx as nx
-import pandas as pd
+import React, { useState, useCallback } from 'react';
+import ReactFlow, {
+  MiniMap,
+  Controls,
+  Background,
+  addEdge,
+  useNodesState,
+  useEdgesState,
+  ReactFlowProvider,
+} from 'reactflow';
+import 'reactflow/dist/style.css';
+import Papa from 'papaparse';
 
-# Enable the Panel extension
-pn.extension("plotly")
+const initialNodes = [];
 
-def hierarchical_structure_app(nodes, links, statuses, layers):
-    """
-    Create a Panel app for visualizing hierarchical structure with Plotly and NetworkX.
+const initialEdges = [];
 
-    Parameters:
-    - nodes: List of node names.
-    - links: List of tuples representing edges between nodes.
-    - statuses: List of statuses corresponding to each node.
-    - layers: Dictionary defining the hierarchical layers/subsets of nodes.
+const App = () => {
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [allNodes, setAllNodes] = useState([]);
+  const [allEdges, setAllEdges] = useState([]);
 
-    Returns:
-    - layout: Panel layout containing the interactive visualization.
-    """
-    # Create a NetworkX graph
-    G = nx.DiGraph()
+  const handleFileUpload = useCallback((event) => {
+    const file = event.target.files[0];
+    if (file) {
+      Papa.parse(file, {
+        header: true,
+        complete: (results) => {
+          const data = results.data;
+          const processedNodes = data.map((item) => ({
+            id: item.node,
+            type: item.type || 'default',
+            data: {
+              label: item.node,
+              value: item.value,
+              graphdepth: parseInt(item.graphDepth),
+              parentNode: item.parentNode,
+            },
+            position: { x: 0, y: 0 },
+            draggable: true,
+            collapsed: true,
+          }));
 
-    # Add nodes with status
-    for node, status in zip(nodes, statuses):
-        G.add_node(node, status=status)
+          const processedEdges = data
+            .filter((item) => item.parentNode)
+            .map((item) => ({
+              id: `e-${item.parentNode}-${item.node}`,
+              source: item.parentNode,
+              target: item.node,
+            }));
 
-    # Add edges
-    for link in links:
-        G.add_edge(*link)
+          setAllNodes(processedNodes);
+          setAllEdges(processedEdges);
 
-    # Compute multipartite layout
-    pos = nx.multipartite_layout(G, subset_key=layers)
+          // Set the first node (root node) as the initial node
+          if (processedNodes.length > 0) {
+            setNodes([processedNodes[0]]);
+          }
+        },
+      });
+    }
+  }, []);
 
-    # Create a DataFrame from the positions
-    df = pd.DataFrame({
-        'node': list(pos.keys()),
-        'x': [pos[node][0] for node in pos],
-        'y': [pos[node][1] for node in pos],
-        'status': [G.nodes[node]['status'] for node in pos]
-    })
+  const generateEdges = useCallback((nodeId) => {
+    const newEdges = allNodes
+      .filter(node => node.data.parentNode === nodeId)
+      .map(node => ({
+        id: `e-${node.data.parentNode}-${node.id}`,
+        source: node.data.parentNode,
+        target: node.id,
+      }));
+    setEdges(prevEdges => [...prevEdges, ...newEdges]);
+  }, [allNodes, setEdges]);
 
-    # Create Plotly traces for edges
-    edge_x = []
-    edge_y = []
-    for edge in G.edges():
-        x0, y0 = pos[edge[0]]
-        x1, y1 = pos[edge[1]]
-        edge_x += [x0, x1, None]
-        edge_y += [y0, y1, None]
+  const onNodeClick = useCallback((event, node) => {
+    if (node.data.collapsed) {
+      const childNodes = allNodes.filter(n => n.data.parentNode === node.id);
+      childNodes.forEach(child => {
+        child.position = {
+          x: node.position.x + 200,
+          y: node.position.y + 100 * childNodes.indexOf(child),
+        };
+      });
+      setNodes(prevNodes => [...prevNodes, ...childNodes]);
+      generateEdges(node.id);
+    }
+    setNodes(prevNodes =>
+      prevNodes.map(n =>
+        n.id === node.id ? { ...n, data: { ...n.data, collapsed: !n.data.collapsed } } : n
+      )
+    );
+  }, [allNodes, generateEdges]);
 
-    edge_trace = go.Scatter(
-        x=edge_x, y=edge_y,
-        line=dict(width=1, color='#888'),
-        hoverinfo='none',
-        mode='lines'
-    )
+  const onConnect = useCallback(
+    (params) => setEdges((eds) => addEdge(params, eds)),
+    [setEdges]
+  );
 
-    # Create Plotly scatter plot for nodes
-    fig = go.Figure(data=[edge_trace])
-    fig.add_trace(go.Scatter(
-        x=df['x'], y=df['y'],
-        text=df['node'],
-        mode='markers+text',
-        textposition='top center',
-        hoverinfo='text',
-        marker=dict(
-            showscale=False,
-            color=df['status'].map({'active': 'green', 'inactive': 'red'}),
-            size=20,
-            line=dict(width=2)
-        )
-    ))
+  return (
+    <div style={{ width: '100vw', height: '100vh' }}>
+      <input type="file" accept=".csv" onChange={handleFileUpload} />
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onNodeClick={onNodeClick}
+        onConnect={onConnect}
+        fitView
+      >
+        <Controls />
+        <MiniMap />
+        <Background variant="dots" gap={12} size={1} />
+      </ReactFlow>
+    </div>
+  );
+};
 
-    fig.update_layout(
-        title='Hierarchical Data Visualization with Multipartite Layout',
-        titlefont_size=16,
-        showlegend=False,
-        hovermode='closest',
-        margin=dict(b=20, l=5, r=5, t=40),
-        xaxis=dict(showgrid=False, zeroline=False),
-        yaxis=dict(showgrid=False, zeroline=False)
-    )
-
-    # Create a Panel Plotly pane
-    plotly_pane_event = pn.pane.Plotly(fig, height=800, sizing_mode="stretch_width")
-
-    # Define a callback function for node interactions
-    def display_node_info(event):
-        if not event:
-            return "No node clicked"
-        try:
-            point = event["points"][0]
-            node = point['text']
-
-            # Determine parent and children nodes
-            parent_node = None
-            children_nodes = []
-            for layer, nodes_in_layer in layers.items():
-                if node in nodes_in_layer:
-                    if len(nodes_in_layer) == 1:
-                        parent_node = None  # Root node has no parent
-                    else:
-                        parent_node = list(layers.items())[list(layers.keys()).index(layer) - 1][1][0]
-                    children_nodes = [n for n in nodes_in_layer if n != node]
-                    break
-
-            # Generate output based on node interaction
-            if parent_node:
-                parent_status = G.nodes[parent_node]['status']
-                children_statuses = [G.nodes[child]['status'] for child in children_nodes]
-                children_info = ', '.join([f"{child} ({status})" for child, status in zip(children_nodes, children_statuses)])
-                return f"**You clicked on node {node} with status: {G.nodes[node]['status']}**<br>" \
-                       f"Parent node: {parent_node} ({parent_status})<br>" \
-                       f"Children nodes: {children_info}"
-            else:
-                return f"**You clicked on node {node} with status: {G.nodes[node]['status']}**<br>" \
-                       f"This node has no parent and {len(children_nodes)} children"
-
-        except Exception as ex:
-            return f"You clicked the Plotly Chart! I could not determine the node: {ex}"
-
-    # Bind the callback function to the click event
-    ichild_view = pn.bind(display_node_info, plotly_pane_event.param.click_data)
-
-    # Put things together in a Panel layout
-    layout = pn.Column(
-        pn.pane.Markdown("# Hierarchical Structure Scatter Plot with Multipartite Layout"),
-        plotly_pane_event,
-        ichild_view
-    )
-
-    return layout
-
-# Sample data for a hierarchical structure
-nodes = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']
-links = [('A', 'B'), ('A', 'C'), ('B', 'D'), ('B', 'E'), ('C', 'F'), ('C', 'G'), ('D', 'H'), ('D', 'I')]
-statuses = ['active', 'inactive', 'active', 'inactive', 'active', 'inactive', 'active', 'inactive', 'active']
-
-# Define partitions or layers
-layers = {'layer1': ['A'], 'layer2': ['B', 'C'], 'layer3': ['D', 'E', 'F', 'G'], 'layer4': ['H', 'I']}
-
-# Create the Panel app
-hierarchical_app = hierarchical_structure_app(nodes, links, statuses, layers)
-
-# Serve the Panel app
-hierarchical_app.servable()
+export default () => (
+  <ReactFlowProvider>
+    <App />
+  </ReactFlowProvider>
+);
