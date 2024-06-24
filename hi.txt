@@ -1,5 +1,14 @@
 import React, { useState, useCallback } from 'react';
-import ReactFlow, { MiniMap, Controls, Background, addEdge } from 'react-flow';
+import ReactFlow, {
+  MiniMap,
+  Controls,
+  Background,
+  addEdge,
+  useNodesState,
+  useEdgesState,
+  ReactFlowProvider
+} from 'reactflow';
+import 'reactflow/dist/style.css';
 import Papa from 'papaparse';
 
 const initialNodes = [
@@ -7,7 +16,7 @@ const initialNodes = [
     id: 'root',
     type: 'default',
     data: { label: 'Root', value: 'Root Node', graphdepth: 0, parentNode: null },
-    position: { x: 0, y: 0 },
+    position: { x: 250, y: 25 },
     draggable: true,
     collapsed: false,
   },
@@ -16,7 +25,8 @@ const initialNodes = [
 const initialEdges = [];
 
 const App = () => {
-  const [elements, setElements] = useState([...initialNodes, ...initialEdges]);
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
   const handleFileUpload = useCallback((event) => {
     const file = event.target.files[0];
@@ -36,61 +46,63 @@ const App = () => {
             },
             position: { x: 0, y: 0 },
             draggable: true,
-            collapsed: true, // Initially collapsed
+            collapsed: true,
           }));
 
-          const processedEdges = generateEdges(processedNodes);
-          const updatedElements = [...processedNodes, ...processedEdges];
-          setElements(updatedElements);
+          setNodes([...initialNodes, ...processedNodes]);
         },
       });
     }
-  }, []);
+  }, [setNodes]);
 
-  const generateEdges = (nodes) => {
-    const edges = [];
-    nodes.forEach((node) => {
-      if (node.data.parentNode) {
-        edges.push({
-          id: `e-${node.data.parentNode}-${node.id}`,
-          source: node.data.parentNode,
-          target: node.id,
-        });
-      }
-    });
-    return edges;
-  };
+  const generateEdges = useCallback((nodeId) => {
+    const newEdges = nodes
+      .filter(node => node.data.parentNode === nodeId)
+      .map(node => ({
+        id: `e-${node.data.parentNode}-${node.id}`,
+        source: node.data.parentNode,
+        target: node.id,
+      }));
+    setEdges(prevEdges => [...prevEdges, ...newEdges]);
+  }, [nodes, setEdges]);
 
-  const handleNodeClick = (nodeId) => {
-    const updatedElements = elements.map((el) =>
-      el.id === nodeId ? { ...el, data: { ...el.data, collapsed: !el.data.collapsed } } : el
+  const onNodeClick = (event, node) => {
+    if (node.data.collapsed) {
+      generateEdges(node.id);
+    }
+    setNodes(prevNodes =>
+      prevNodes.map(n =>
+        n.id === node.id ? { ...n, data: { ...n.data, collapsed: !n.data.collapsed } } : n
+      )
     );
-    setElements(updatedElements);
   };
+
+  const onConnect = useCallback(
+    (params) => setEdges((eds) => addEdge(params, eds)),
+    [setEdges]
+  );
 
   return (
-    <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
+    <div style={{ width: '100vw', height: '100vh' }}>
       <input type="file" accept=".csv" onChange={handleFileUpload} />
-      <ReactFlow elements={elements} onLoad={() => console.log('Flow loaded')}>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onNodeClick={onNodeClick}
+        onConnect={onConnect}
+      >
         <Controls />
         <MiniMap />
         <Background variant="dots" gap={12} size={1} />
       </ReactFlow>
-      <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 999 }}>
-        <h3>Nodes:</h3>
-        <ul>
-          {elements.map((el) => (
-            <li key={el.id}>
-              {el.data.label}{' '}
-              {el.data.graphdepth > 0 && el.data.parentNode && (
-                <button onClick={() => handleNodeClick(el.id)}>Expand/Collapse</button>
-              )}
-            </li>
-          ))}
-        </ul>
-      </div>
     </div>
   );
 };
 
-export default App;
+export default () => (
+  <ReactFlowProvider>
+    <App />
+  </ReactFlowProvider>
+);
