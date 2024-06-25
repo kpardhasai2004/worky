@@ -10,8 +10,9 @@ import ReactFlow, {
   Node,
   Edge,
   Connection,
-} from 'react-flow-renderer';
-import 'react-flow-renderer/dist/style.css';
+  NodeMouseHandler,
+} from 'reactflow';
+import 'reactflow/dist/style.css';
 import Papa from 'papaparse';
 
 interface NodeData {
@@ -84,9 +85,9 @@ const App: React.FC = () => {
     setEdges(prevEdges => [...prevEdges, ...newEdges]);
   }, [allNodes, setEdges]);
 
-  const onNodeClick = useCallback((event, node) => {
-    if (node.data.collapsed) {
-      const childNodes = allNodes.filter(n => n.data.parentNode === node.id);
+  const onNodeClick: NodeMouseHandler = useCallback((event, node) => {
+    const childNodes = allNodes.filter(n => n.data.parentNode === node.id && n.hidden);
+    if (childNodes.length > 0) {
       childNodes.forEach(child => {
         child.position = {
           x: node.position.x + 200,
@@ -99,7 +100,7 @@ const App: React.FC = () => {
     }
     setNodes(prevNodes =>
       prevNodes.map(n =>
-        n.id === node.id ? { ...n, data: { ...n.data, collapsed: !n.data.collapsed } } : n
+        n.id === node.id ? { ...n, hidden: false } : n
       )
     );
   }, [allNodes, generateEdges]);
@@ -113,13 +114,13 @@ const App: React.FC = () => {
     <div style={{ width: '100vw', height: '100vh' }}>
       <input type="file" accept=".csv" onChange={handleFileUpload} />
       <ReactFlow
-        elements={[...nodes, ...edges]}
-        onElementsRemove={(elementsToRemove) => setNodes((nds) => nds.filter((n) => !elementsToRemove.includes(n)))}
-        onConnect={onConnect}
-        onLoad={(reactFlowInstance) => reactFlowInstance.fitView()}
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
-        snapToGrid
-        snapGrid={[15, 15]}
+        onConnect={onConnect}
+        fitView
       >
         <Controls />
         <MiniMap />
