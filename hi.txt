@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import ReactFlow, {
   MiniMap,
   Controls,
@@ -14,6 +14,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import Papa from 'papaparse';
+import dagre from 'dagre';
 
 interface NodeData {
   node: string;
@@ -26,6 +27,35 @@ interface NodeData {
 const initialNodes: Node[] = [];
 
 const initialEdges: Edge[] = [];
+
+const dagreGraph = new dagre.graphlib.Graph();
+dagreGraph.setDefaultEdgeLabel(() => ({}));
+
+const getLayoutedNodes = (nodes: Node[], edges: Edge[]) => {
+  const nodeWidth = 172;
+  const nodeHeight = 36;
+
+  dagreGraph.setGraph({ rankdir: 'TB' });
+
+  nodes.forEach((node) => {
+    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
+  });
+
+  edges.forEach((edge) => {
+    dagreGraph.setEdge(edge.source, edge.target);
+  });
+
+  dagre.layout(dagreGraph);
+
+  return nodes.map((node) => {
+    const nodeWithPosition = dagreGraph.node(node.id);
+    node.position = {
+      x: nodeWithPosition.x - nodeWidth / 2,
+      y: nodeWithPosition.y - nodeHeight / 2,
+    };
+    return node;
+  });
+};
 
 const App: React.FC = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>(initialNodes);
@@ -46,7 +76,7 @@ const App: React.FC = () => {
             data: {
               label: item.node,
               value: item.value,
-              graphdepth: parseInt(item.graphDepth.toString(), 10),
+              graphdepth: item.graphDepth,
               parentNode: item.parentNode,
             },
             position: { x: 0, y: 0 },
@@ -89,26 +119,29 @@ const App: React.FC = () => {
     const childNodes = allNodes.filter(n => n.data.parentNode === node.id && n.hidden);
     if (childNodes.length > 0) {
       childNodes.forEach(child => {
-        child.position = {
-          x: node.position.x + 200,
-          y: node.position.y + 100 * childNodes.indexOf(child),
-        };
         child.hidden = false;
       });
-      setNodes(prevNodes => [...prevNodes, ...childNodes]);
+      setNodes(prevNodes => {
+        const updatedNodes = [...prevNodes, ...childNodes];
+        return getLayoutedNodes(updatedNodes, edges);
+      });
       generateEdges(node.id);
     }
     setNodes(prevNodes =>
-      prevNodes.map(n =>
+      getLayoutedNodes(prevNodes.map(n =>
         n.id === node.id ? { ...n, hidden: false } : n
-      )
+      ), edges)
     );
-  }, [allNodes, generateEdges]);
+  }, [allNodes, edges, generateEdges]);
 
   const onConnect = useCallback(
     (params: Edge | Connection) => setEdges((eds) => addEdge(params, eds)),
     [setEdges]
   );
+
+  useEffect(() => {
+    setNodes((nds) => getLayoutedNodes(nds, edges));
+  }, [edges]);
 
   return (
     <div style={{ width: '100vw', height: '100vh' }}>
