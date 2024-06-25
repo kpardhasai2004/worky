@@ -7,11 +7,9 @@ import ReactFlow, {
   useNodesState,
   useEdgesState,
   ReactFlowProvider,
-  Elements,
+  Node,
+  Edge,
   Connection,
-  Edge as FlowEdge,
-  Node as FlowNode,
-  OnLoadParams,
 } from 'react-flow-renderer';
 import 'react-flow-renderer/dist/style.css';
 import Papa from 'papaparse';
@@ -24,15 +22,15 @@ interface NodeData {
   parentNode?: string | null;
 }
 
-const initialNodes: Elements = [];
+const initialNodes: Node[] = [];
 
-const initialEdges: FlowEdge[] = [];
+const initialEdges: Edge[] = [];
 
 const App: React.FC = () => {
-  const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<FlowEdge>(initialEdges);
-  const [allNodes, setAllNodes] = useState<FlowNode[]>([]);
-  const [allEdges, setAllEdges] = useState<FlowEdge[]>([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
+  const [allNodes, setAllNodes] = useState<Node[]>([]);
+  const [allEdges, setAllEdges] = useState<Edge[]>([]);
 
   const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -41,7 +39,7 @@ const App: React.FC = () => {
         header: true,
         complete: (results) => {
           const data = results.data;
-          const processedNodes: FlowNode[] = data.map((item) => ({
+          const processedNodes: Node[] = data.map((item) => ({
             id: item.node,
             type: item.type || 'default',
             data: {
@@ -55,7 +53,7 @@ const App: React.FC = () => {
             hidden: true,
           }));
 
-          const processedEdges: FlowEdge[] = data
+          const processedEdges: Edge[] = data
             .filter((item) => item.parentNode)
             .map((item) => ({
               id: `e-${item.parentNode}-${item.node}`,
@@ -107,7 +105,7 @@ const App: React.FC = () => {
   }, [allNodes, generateEdges]);
 
   const onConnect = useCallback(
-    (params: FlowEdge | Connection) => setEdges((eds) => addEdge(params, eds)),
+    (params: Edge | Connection) => setEdges((eds) => addEdge(params, eds)),
     [setEdges]
   );
 
@@ -118,7 +116,7 @@ const App: React.FC = () => {
         elements={[...nodes, ...edges]}
         onElementsRemove={(elementsToRemove) => setNodes((nds) => nds.filter((n) => !elementsToRemove.includes(n)))}
         onConnect={onConnect}
-        onLoad={(reactFlowInstance: OnLoadParams) => reactFlowInstance.fitView()}
+        onLoad={(reactFlowInstance) => reactFlowInstance.fitView()}
         onNodeClick={onNodeClick}
         snapToGrid
         snapGrid={[15, 15]}
