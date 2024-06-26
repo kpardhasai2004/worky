@@ -1,173 +1,73 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import ReactFlow, {
-  MiniMap,
-  Controls,
-  Background,
-  addEdge,
-  useNodesState,
-  useEdgesState,
-  ReactFlowProvider,
-  Node,
-  Edge,
-  Connection,
-  NodeMouseHandler,
-} from 'reactflow';
-import 'reactflow/dist/style.css';
-import axios from 'axios';
-import dagre from 'dagre';
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import GraphWithProvider from "./components/HierarchicalGraph";
 
-interface NodeData {
-  node: string;
-  type?: string;
-  value?: string;
-  graphDepth: number;
-  parentNode?: string | null;
-}
+const controlsStyles = {
+  marginBottom: "20px",
+};
 
-const initialNodes: Node[] = [];
+const controlsLabelStyles = {
+  marginRight: "10px",
+};
 
-const initialEdges: Edge[] = [];
+const controlsInputStyles = {
+  marginRight: "10px",
+};
 
-const dagreGraph = new dagre.graphlib.Graph();
-dagreGraph.setDefaultEdgeLabel(() => ({}));
+const controlsSpanStyles = {
+  fontWeight: "bold",
+};
 
-const getLayoutedNodes = (nodes: Node[], edges: Edge[]) => {
-  const nodeWidth = 172;
-  const nodeHeight = 36;
-
-  dagreGraph.setGraph({ rankdir: 'TB' });
-
-  nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
-  });
-
-  edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target);
-  });
-
-  dagre.layout(dagreGraph);
-
-  return nodes.map((node) => {
-    const nodeWithPosition = dagreGraph.node(node.id);
-    node.position = {
-      x: nodeWithPosition.x - nodeWidth / 2,
-      y: nodeWithPosition.y - nodeHeight / 2,
-    };
-    return node;
-  });
+const graphContainerStyles = {
+  height: "calc(100vh - 50px)", // Adjust the height based on your controls' height
+  overflow: "hidden",
 };
 
 const App: React.FC = () => {
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
-  const [allNodes, setAllNodes] = useState<Node[]>([]);
-  const [allEdges, setAllEdges] = useState<Edge[]>([]);
+  const [sliderValue, setSliderValue] = useState<number>(0);
+  const [data, setData] = useState<any[]>([]); // Adjust the type as per your data structure
 
   useEffect(() => {
-    // Replace with your API endpoint
-    const fetchNodes = async () => {
-      try {
-        const response = await axios.get<NodeData[]>('https://api.example.com/nodes');
-        const data = response.data;
-        const processedNodes: Node[] = data.map((item) => ({
-          id: item.node,
-          type: item.type || 'default',
-          data: {
-            label: item.node,
-            value: item.value,
-            graphdepth: item.graphDepth,
-            parentNode: item.parentNode,
-          },
-          position: { x: 0, y: 0 },
-          draggable: true,
-          hidden: true,
+    // Axios GET request to fetch data
+    axios.get("http://localhost:8100/api/data")
+      .then(response => {
+        // Extract and flatten the arrays from the JSON structure
+        const dataArray = Object.values(response.data).flat(); // Adjust based on your actual API response structure
+        
+        // Optionally, parse or process data fields
+        const processedData = dataArray.map((item: any) => ({
+          ...item,
+          graph_depth: parseInt(item.graph_depth, 10), // Convert graph_depth to number if needed
         }));
 
-        const processedEdges: Edge[] = data
-          .filter((item) => item.parentNode)
-          .map((item) => ({
-            id: `e-${item.parentNode}-${item.node}`,
-            source: item.parentNode as string,
-            target: item.node,
-          }));
-
-        setAllNodes(processedNodes);
-        setAllEdges(processedEdges);
-
-        // Set the first node (root node) as the initial node
-        if (processedNodes.length > 0) {
-          setNodes([{ ...processedNodes[0], hidden: false }]);
-        }
-      } catch (error) {
-        console.error('Error fetching node data', error);
-      }
-    };
-
-    fetchNodes();
-  }, [setNodes]);
-
-  const generateEdges = useCallback((nodeId: string) => {
-    const newEdges = allNodes
-      .filter(node => node.data.parentNode === nodeId)
-      .map(node => ({
-        id: `e-${node.data.parentNode}-${node.id}`,
-        source: node.data.parentNode as string,
-        target: node.id,
-      }));
-    setEdges(prevEdges => [...prevEdges, ...newEdges]);
-  }, [allNodes, setEdges]);
-
-  const onNodeClick: NodeMouseHandler = useCallback((event, node) => {
-    const childNodes = allNodes.filter(n => n.data.parentNode === node.id && n.hidden);
-    if (childNodes.length > 0) {
-      childNodes.forEach(child => {
-        child.hidden = false;
+        setData(processedData);
+      })
+      .catch(error => {
+        console.error("Error fetching data:", error);
       });
-      setNodes(prevNodes => {
-        const updatedNodes = [...prevNodes, ...childNodes];
-        return getLayoutedNodes(updatedNodes, edges);
-      });
-      generateEdges(node.id);
-    }
-    setNodes(prevNodes =>
-      getLayoutedNodes(prevNodes.map(n =>
-        n.id === node.id ? { ...n, hidden: false } : n
-      ), edges)
-    );
-  }, [allNodes, edges, generateEdges]);
-
-  const onConnect = useCallback(
-    (params: Edge | Connection) => setEdges((eds) => addEdge(params, eds)),
-    [setEdges]
-  );
-
-  useEffect(() => {
-    setNodes((nds) => getLayoutedNodes(nds, edges));
-  }, [edges]);
+  }, []); // Empty dependency array ensures this effect runs only once on mount
 
   return (
-    <div style={{ width: '100vw', height: '100vh' }}>
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onNodeClick={onNodeClick}
-        onConnect={onConnect}
-        fitView
-      >
-        <Controls />
-        <MiniMap />
-        <Background variant="dots" gap={12} size={1} />
-      </ReactFlow>
+    <div style={{ height: "100vh", overflow: "hidden" }}>
+      <div style={controlsStyles}>
+        <label style={controlsLabelStyles}>
+          Slider Value:
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={sliderValue}
+            onChange={(e) => setSliderValue(parseInt(e.target.value, 10))}
+            style={controlsInputStyles}
+          />
+          <span style={controlsSpanStyles}>{sliderValue}</span>
+        </label>
+      </div>
+      <div style={graphContainerStyles}>
+        <GraphWithProvider data={data} sliderValue={sliderValue} />
+      </div>
     </div>
   );
 };
 
-const WrappedApp: React.FC = () => (
-  <ReactFlowProvider>
-    <App />
-  </ReactFlowProvider>
-);
-
-export default WrappedApp;
+export default App;
