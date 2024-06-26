@@ -123,8 +123,7 @@ const HierarchicalGraph: React.FC<HierarchicalGraphProps> = ({
   sliderValue,
 }) => {
   const hierarchy = parseData(data);
-  const [selectedParentNode, setSelectedParentNode] =
-    useState("<SCLRootCalcNode>");
+  const [selectedParentNode, setSelectedParentNode] = useState("<SCLRootCalcNode>");
   const initialElements: Node[] = [
     {
       id: hierarchy[selectedParentNode].id,
@@ -145,11 +144,7 @@ const HierarchicalGraph: React.FC<HierarchicalGraphProps> = ({
   const { project } = useReactFlow();
 
   const expandNode = (node: Node) => {
-    if (
-      !hierarchy[node.id] ||
-      !hierarchy[node.id].children ||
-      hierarchy[node.id].children.length === 0
-    ) {
+    if (!hierarchy[node.id] || !hierarchy[node.id].children || hierarchy[node.id].children.length === 0) {
       return;
     }
 
@@ -160,14 +155,11 @@ const HierarchicalGraph: React.FC<HierarchicalGraphProps> = ({
       currentExpandedNodes.delete(node.id);
       // Remove children nodes and their edges
       const nodesToKeep = nodes.filter(
-        (n) =>
-          !hierarchy[node.id].children.some((child: any) => child.id === n.id)
+        (n) => !hierarchy[node.id].children.some((child: any) => child.id === n.id)
       );
       const edgesToKeep = edges.filter(
         (e) =>
-          !hierarchy[node.id].children.some(
-            (child: any) => e.source === node.id && e.target === child.id
-          )
+          !hierarchy[node.id].children.some((child: any) => e.source === node.id && e.target === child.id)
       );
       setNodes(nodesToKeep);
       setEdges(edgesToKeep);
@@ -289,4 +281,3 @@ const GraphWithProvider: React.FC<HierarchicalGraphProps> = (props) => (
 );
 
 export default GraphWithProvider;
-// /component/Hierarchical.tsx
