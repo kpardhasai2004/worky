@@ -1,23 +1,19 @@
-// components/HierarchicalGraph.tsx
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from "react";
 import ReactFlow, {
   MiniMap,
   Controls,
   Background,
-  addEdge,
   useNodesState,
   useEdgesState,
   ReactFlowProvider,
   Node,
   Edge,
-  Connection,
-  NodeMouseHandler,
-} from 'reactflow';
-import 'reactflow/dist/style.css';
-import dagre from 'dagre';
+  useReactFlow,
+} from "reactflow";
+import "reactflow/dist/style.css";
+import dagre from "dagre";
 
-interface NodeData {
+interface DataItem {
   parent_node: string | null;
   node: string;
   graph_depth: number;
@@ -27,7 +23,7 @@ interface NodeData {
 }
 
 interface HierarchicalGraphProps {
-  data: NodeData[];
+  data: DataItem[];
   sliderValue: number;
 }
 
@@ -37,33 +33,7 @@ const nodeHeight = 36;
 const dagreGraph = new dagre.graphlib.Graph();
 dagreGraph.setDefaultEdgeLabel(() => ({}));
 
-const getLayoutedNodes = (nodes: Node[], edges: Edge[], direction = 'TB') => {
-  const isHorizontal = direction === 'LR' || direction === 'RL';
-  dagreGraph.setGraph({ rankdir: direction });
-
-  nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
-  });
-
-  edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target);
-  });
-
-  dagre.layout(dagreGraph);
-
-  return nodes.map((node) => {
-    const nodeWithPosition = dagreGraph.node(node.id);
-    node.position = {
-      x: nodeWithPosition.x - nodeWidth / 2,
-      y: nodeWithPosition.y - nodeHeight / 2,
-    };
-    node.targetPosition = isHorizontal ? 'left' : 'top';
-    node.sourcePosition = isHorizontal ? 'right' : 'bottom';
-    return node;
-  });
-};
-
-const parseData = (data: NodeData[]) => {
+const parseData = (data: DataItem[]) => {
   const hierarchy: { [key: string]: any } = {};
 
   data.forEach((item) => {
@@ -94,15 +64,49 @@ const parseData = (data: NodeData[]) => {
 
 const getNodeColor = (type: string) => {
   switch (type) {
-    case 'input':
-      return '#FFD700'; // Gold
-    case 'output':
-      return '#FF6347'; // Tomato
-    case 'option':
-      return '#40E0D0'; // Turquoise
+    case "input":
+      return "#FFD700"; // Gold
+    case "output":
+      return "#FF6347"; // Tomato
+    case "option":
+      return "#40E0D0"; // Turquoise
     default:
-      return '#D3D3D3'; // Light Gray
+      return "#D3D3D3"; // Light Gray
   }
+};
+
+const getLayoutedElements = (
+  nodes: Node[],
+  edges: Edge[],
+  direction: string = "TB"
+) => {
+  const isHorizontal = direction === "LR" || direction === "RL";
+  dagreGraph.setGraph({ rankdir: direction });
+
+  nodes.forEach((node) => {
+    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
+  });
+
+  edges.forEach((edge) => {
+    dagreGraph.setEdge(edge.source, edge.target);
+  });
+
+  dagre.layout(dagreGraph);
+
+  nodes.forEach((node) => {
+    const nodeWithPosition = dagreGraph.node(node.id);
+    (node as any).targetPosition = isHorizontal ? "left" : "top";
+    (node as any).sourcePosition = isHorizontal ? "right" : "bottom";
+
+    node.position = {
+      x: nodeWithPosition.x - nodeWidth / 2,
+      y: nodeWithPosition.y - nodeHeight / 2,
+    };
+
+    return node;
+  });
+
+  return { nodes, edges };
 };
 
 const HierarchicalGraph: React.FC<HierarchicalGraphProps> = ({
@@ -110,7 +114,8 @@ const HierarchicalGraph: React.FC<HierarchicalGraphProps> = ({
   sliderValue,
 }) => {
   const hierarchy = parseData(data);
-  const [selectedParentNode, setSelectedParentNode] = useState('<SCLRootCalcNode>');
+  const [selectedParentNode, setSelectedParentNode] =
+    useState("<SCLRootCalcNode>");
   const initialElements: Node[] = [
     {
       id: hierarchy[selectedParentNode].id,
@@ -126,77 +131,82 @@ const HierarchicalGraph: React.FC<HierarchicalGraphProps> = ({
   const [nodes, setNodes, onNodesChange] = useNodesState(initialElements);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [expandedNodes, setExpandedNodes] = useState<string[]>([]);
-  const [direction, setDirection] = useState('TB');
+  const [direction, setDirection] = useState("TB");
 
-  const expandNode = (node: Node) => {
-    if (
-      !hierarchy[node.id] ||
-      !hierarchy[node.id].children ||
-      hierarchy[node.id].children.length === 0
-    ) {
-      return;
-    }
+  const { project } = useReactFlow();
 
-    const currentExpandedNodes = new Set(expandedNodes);
+  const expandNode = useCallback(
+    (node: Node) => {
+      if (
+        !hierarchy[node.id] ||
+        !hierarchy[node.id].children ||
+        hierarchy[node.id].children.length === 0
+      ) {
+        return;
+      }
 
-    if (currentExpandedNodes.has(node.id)) {
-      // Collapse the node
-      currentExpandedNodes.delete(node.id);
-      // Remove children nodes and their edges
-      const nodesToKeep = nodes.filter(
-        (n) =>
-          !hierarchy[node.id].children.some((child: any) => child.id === n.id)
-      );
-      const edgesToKeep = edges.filter(
-        (e) =>
-          !hierarchy[node.id].children.some(
-            (child: any) => e.source === node.id && e.target === child.id
-          )
-      );
-      setNodes(nodesToKeep);
-      setEdges(edgesToKeep);
-    } else {
-      // Expand the node
-      currentExpandedNodes.add(node.id);
+      const currentExpandedNodes = new Set(expandedNodes);
 
-      const newNodes = [...nodes];
-      const newEdges = [...edges];
+      if (currentExpandedNodes.has(node.id)) {
+        // Collapse the node
+        currentExpandedNodes.delete(node.id);
+        // Remove children nodes and their edges
+        const nodesToKeep = nodes.filter(
+          (n) =>
+            !hierarchy[node.id].children.some((child: any) => child.id === n.id)
+        );
+        const edgesToKeep = edges.filter(
+          (e) =>
+            !hierarchy[node.id].children.some(
+              (child: any) => e.source === node.id && e.target === child.id
+            )
+        );
+        setNodes(nodesToKeep);
+        setEdges(edgesToKeep);
+      } else {
+        // Expand the node
+        currentExpandedNodes.add(node.id);
 
-      hierarchy[node.id].children.forEach((child: any) => {
-        const position = {
-          x: node.position.x + (Math.random() - 0.5) * 200,
-          y: node.position.y + 100,
-        };
-        newNodes.push({
-          id: child.id,
-          data: { label: child.label },
-          position,
-          style: { backgroundColor: getNodeColor(child.type) },
+        const newNodes = [...nodes];
+        const newEdges = [...edges];
+
+        hierarchy[node.id].children.forEach((child: any) => {
+          const position = project({
+            x: node.position.x + (Math.random() - 0.5) * 200,
+            y: node.position.y + 100,
+          });
+          newNodes.push({
+            id: child.id,
+            data: { label: child.label },
+            position,
+            style: { backgroundColor: getNodeColor(child.type) },
+          });
+
+          newEdges.push({
+            id: `${node.id}-${child.id}`,
+            source: node.id,
+            target: child.id,
+            type: "smoothstep",
+            animated: false,
+          });
+
+          // Recursively expand child nodes if they are already in the expanded list
+          if (currentExpandedNodes.has(child.id)) {
+            expandNode(child);
+          }
         });
 
-        newEdges.push({
-          id: `${node.id}-${child.id}`,
-          source: node.id,
-          target: child.id,
-          type: 'smoothstep',
-          animated: false,
-        });
+        setNodes(newNodes);
+        setEdges(newEdges);
+      }
 
-        // Recursively expand child nodes if they are already in the expanded list
-        if (currentExpandedNodes.has(child.id)) {
-          expandNode(child);
-        }
-      });
-
-      setNodes(newNodes);
-      setEdges(newEdges);
-    }
-
-    setExpandedNodes(Array.from(currentExpandedNodes));
-  };
+      setExpandedNodes(Array.from(currentExpandedNodes));
+    },
+    [hierarchy, nodes, edges, expandedNodes, project]
+  );
 
   useEffect(() => {
-    const layoutedElements = getLayoutedNodes(nodes, edges, direction);
+    const layoutedElements = getLayoutedElements(nodes, edges, direction);
     setNodes(layoutedElements.nodes);
     setEdges(layoutedElements.edges);
   }, [nodes.length, edges.length, sliderValue, direction]);
@@ -220,14 +230,14 @@ const HierarchicalGraph: React.FC<HierarchicalGraphProps> = ({
   }, [selectedParentNode]);
 
   return (
-    <div style={{ height: '100vh', width: '100%' }}>
-      <div style={{ marginBottom: '20px' }}>
-        <label style={{ marginRight: '10px' }}>
+    <div style={{ height: "100%" }}>
+      <div style={{ marginBottom: "20px" }}>
+        <label style={{ marginRight: "10px" }}>
           Direction:
           <select
             value={direction}
             onChange={(e) => setDirection(e.target.value)}
-            style={{ marginLeft: '10px' }}
+            style={{ marginLeft: "10px" }}
           >
             <option value="TB">Top-Bottom</option>
             <option value="BT">Bottom-Top</option>
@@ -235,12 +245,12 @@ const HierarchicalGraph: React.FC<HierarchicalGraphProps> = ({
             <option value="RL">Right-Left</option>
           </select>
         </label>
-        <label style={{ marginLeft: '20px', marginRight: '10px' }}>
+        <label style={{ marginRight: "10px" }}>
           Parent Node:
           <select
             value={selectedParentNode}
             onChange={(e) => setSelectedParentNode(e.target.value)}
-            style={{ marginLeft: '10px' }}
+            style={{ marginLeft: "10px" }}
           >
             {Object.keys(hierarchy).map((key) => (
               <option key={key} value={key}>
@@ -290,45 +300,78 @@ export default GraphWithProvider;
 
 
 
-// App.tsx
 
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import GraphWithProvider from './components/HierarchicalGraph';
+
+
+
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import GraphWithProvider from "./components/HierarchicalGraph";
+
+const controlsStyles = {
+  marginBottom: "20px",
+};
+
+const controlsLabelStyles = {
+  marginRight: "10px",
+};
+
+const controlsInputStyles = {
+  marginRight: "10px",
+};
+
+const controlsSpanStyles = {
+  fontWeight: "bold",
+};
+
+const graphContainerStyles = {
+  height: "calc(100vh - 50px)", // Adjust the height based on your controls' height
+  overflow: "hidden",
+};
 
 const App: React.FC = () => {
   const [sliderValue, setSliderValue] = useState<number>(0);
-  const [data, setData] = useState<NodeData[]>([]);
+  const [data, setData] = useState<any[]>([]); // Adjust the type as per your data structure
 
   useEffect(() => {
-    axios.get('http://localhost:8100/api/data')
+    // Axios GET request to fetch data
+    axios.get("http://localhost:8100/api/data")
       .then(response => {
-        const dataArray = Object.values(response.data).flat();
+        // Extract and flatten the arrays from the JSON structure
+        const dataArray = Object.values(response.data).flat(); // Adjust based on your actual API response structure
+        
+        // Optionally, parse or process data fields
         const processedData = dataArray.map((item: any) => ({
           ...item,
-          graph_depth: parseInt(item.graph_depth, 10),
+          graph_depth: parseInt(item.graph_depth, 10), // Convert graph_depth to number if needed
         }));
+
         setData(processedData);
       })
       .catch(error => {
-        console.error('Error fetching data:', error);
+        console.error("Error fetching data:", error);
       });
-  }, []);
+  }, []); // Empty dependency array ensures this effect runs only once on mount
 
   return (
-    <div style={{ height: '100vh', overflow: 'hidden' }}>
-      <div style={{ padding: '20px' }}>
-        <label style={{ marginRight: '10px' }}>Depth Filter:</label>
-        <input
-          type="range"
-          min="0"
-          max="10"
-          value={sliderValue}
-          onChange={(e) => setSliderValue(parseInt(e.target.value))}
-          style={{ width: '200px' }}
-        />
+    <div style={{ height: "100vh", overflow: "hidden" }}>
+      <div style={controlsStyles}>
+        <label style={controlsLabelStyles}>
+          Slider Value:
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={sliderValue}
+            onChange={(e) => setSliderValue(parseInt(e.target.value, 10))}
+            style={controlsInputStyles}
+          />
+          <span style={controlsSpanStyles}>{sliderValue}</span>
+        </label>
       </div>
-      <GraphWithProvider data={data} sliderValue={sliderValue} />
+      <div style={graphContainerStyles}>
+        <GraphWithProvider data={data} sliderValue={sliderValue} />
+      </div>
     </div>
   );
 };
