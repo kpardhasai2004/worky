@@ -1,3 +1,95 @@
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import GraphWithProvider from "./components/HierarchicalGraph";
+
+const controlsStyles = {
+  marginBottom: "20px",
+};
+
+const controlsLabelStyles = {
+  marginRight: "10px",
+};
+
+const controlsInputStyles = {
+  marginRight: "10px",
+};
+
+const controlsSpanStyles = {
+  fontWeight: "bold",
+};
+
+const graphContainerStyles = {
+  height: "calc(100vh - 50px)", // Adjust the height based on your controls' height
+  overflow: "hidden",
+};
+
+const App: React.FC = () => {
+  const [sliderValue, setSliderValue] = useState<number>(0);
+  const [data, setData] = useState<DataItem[]>([]);
+
+  useEffect(() => {
+    // Axios GET request to fetch data
+    axios.get("http://localhost:8100/api/data")
+      .then(response => {
+        // Extract and flatten the arrays from the JSON structure
+        const dataArray = Object.values(response.data).flat(); // Adjust based on your actual API response structure
+        
+        // Optionally, parse or process data fields
+        const processedData = dataArray.map((item: any) => ({
+          ...item,
+          graph_depth: parseInt(item.graph_depth, 10), // Convert graph_depth to number if needed
+        }));
+
+        setData(processedData);
+      })
+      .catch(error => {
+        console.error("Error fetching data:", error);
+      });
+  }, []); // Empty dependency array ensures this effect runs only once on mount
+
+  return (
+    <div style={{ height: "100vh", overflow: "hidden" }}>
+      <div style={controlsStyles}>
+        <label style={controlsLabelStyles}>
+          Slider Value:
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={sliderValue}
+            onChange={(e) => setSliderValue(parseInt(e.target.value, 10))}
+            style={controlsInputStyles}
+          />
+          <span style={controlsSpanStyles}>{sliderValue}</span>
+        </label>
+      </div>
+      <div style={graphContainerStyles}>
+        <GraphWithProvider data={data} sliderValue={sliderValue} />
+      </div>
+    </div>
+  );
+};
+
+export default App;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import React, { useState, useEffect, useCallback } from "react";
 import ReactFlow, {
   MiniMap,
@@ -114,8 +206,8 @@ const HierarchicalGraph: React.FC<HierarchicalGraphProps> = ({
   sliderValue,
 }) => {
   const hierarchy = parseData(data);
-  const [selectedParentNode, setSelectedParentNode] =
-    useState("<SCLRootCalcNode>");
+  const initialParentNode = Object.keys(hierarchy)[0];
+  const [selectedParentNode, setSelectedParentNode] = useState(initialParentNode);
   const initialElements: Node[] = [
     {
       id: hierarchy[selectedParentNode].id,
@@ -135,7 +227,7 @@ const HierarchicalGraph: React.FC<HierarchicalGraphProps> = ({
 
   const { project } = useReactFlow();
 
-  const expandNode = useCallback(
+  const toggleExpandNode = useCallback(
     (node: Node) => {
       if (
         !hierarchy[node.id] ||
@@ -180,6 +272,7 @@ const HierarchicalGraph: React.FC<HierarchicalGraphProps> = ({
             data: { label: child.label },
             position,
             style: { backgroundColor: getNodeColor(child.type) },
+            key: child.id, // Add unique key here
           });
 
           newEdges.push({
@@ -188,11 +281,12 @@ const HierarchicalGraph: React.FC<HierarchicalGraphProps> = ({
             target: child.id,
             type: "smoothstep",
             animated: false,
+            key: `${node.id}-${child.id}`, // Add unique key here
           });
 
           // Recursively expand child nodes if they are already in the expanded list
           if (currentExpandedNodes.has(child.id)) {
-            expandNode(child);
+            toggleExpandNode(child);
           }
         });
 
@@ -221,13 +315,14 @@ const HierarchicalGraph: React.FC<HierarchicalGraphProps> = ({
           data: { label: selectedNode.label },
           position: { x: 0, y: 0 },
           style: { backgroundColor: getNodeColor(selectedNode.type) },
+          key: selectedNode.id, // Add unique key here
         },
       ];
       setNodes(initialElements);
       setEdges([]);
       setExpandedNodes([]);
     }
-  }, [selectedParentNode]);
+  }, [selectedParentNode, hierarchy]);
 
   return (
     <div style={{ height: "100%" }}>
@@ -266,7 +361,7 @@ const HierarchicalGraph: React.FC<HierarchicalGraphProps> = ({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         fitView
-        onNodeClick={(event, node) => expandNode(node)}
+        onNodeClick={(event, node) => toggleExpandNode(node)}
       >
         <MiniMap />
         <Controls />
@@ -283,97 +378,3 @@ const GraphWithProvider: React.FC<HierarchicalGraphProps> = (props) => (
 );
 
 export default GraphWithProvider;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-import React, { useState, useEffect } from "react";
-import axios from "axios";
-import GraphWithProvider from "./components/HierarchicalGraph";
-
-const controlsStyles = {
-  marginBottom: "20px",
-};
-
-const controlsLabelStyles = {
-  marginRight: "10px",
-};
-
-const controlsInputStyles = {
-  marginRight: "10px",
-};
-
-const controlsSpanStyles = {
-  fontWeight: "bold",
-};
-
-const graphContainerStyles = {
-  height: "calc(100vh - 50px)", // Adjust the height based on your controls' height
-  overflow: "hidden",
-};
-
-const App: React.FC = () => {
-  const [sliderValue, setSliderValue] = useState<number>(0);
-  const [data, setData] = useState<any[]>([]); // Adjust the type as per your data structure
-
-  useEffect(() => {
-    // Axios GET request to fetch data
-    axios.get("http://localhost:8100/api/data")
-      .then(response => {
-        // Extract and flatten the arrays from the JSON structure
-        const dataArray = Object.values(response.data).flat(); // Adjust based on your actual API response structure
-        
-        // Optionally, parse or process data fields
-        const processedData = dataArray.map((item: any) => ({
-          ...item,
-          graph_depth: parseInt(item.graph_depth, 10), // Convert graph_depth to number if needed
-        }));
-
-        setData(processedData);
-      })
-      .catch(error => {
-        console.error("Error fetching data:", error);
-      });
-  }, []); // Empty dependency array ensures this effect runs only once on mount
-
-  return (
-    <div style={{ height: "100vh", overflow: "hidden" }}>
-      <div style={controlsStyles}>
-        <label style={controlsLabelStyles}>
-          Slider Value:
-          <input
-            type="range"
-            min="0"
-            max="100"
-            value={sliderValue}
-            onChange={(e) => setSliderValue(parseInt(e.target.value, 10))}
-            style={controlsInputStyles}
-          />
-          <span style={controlsSpanStyles}>{sliderValue}</span>
-        </label>
-      </div>
-      <div style={graphContainerStyles}>
-        <GraphWithProvider data={data} sliderValue={sliderValue} />
-      </div>
-    </div>
-  );
-};
-
-export default App;
