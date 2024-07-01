@@ -1,291 +1,116 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import ReactFlow, {
-  MiniMap,
-  Controls,
-  Background,
-  addEdge,
-  useNodesState,
-  useEdgesState,
-  ReactFlowProvider,
-  Node,
-  Edge,
-  Connection,
-  NodeMouseHandler,
-} from 'reactflow';
-import 'reactflow/dist/style.css';
+// App.test.tsx
+import React from 'react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import '@testing-library/jest-dom/extend-expect';
 import axios from 'axios';
-import dagre from 'dagre';
-import {
-  graphContainerStyles,
-  controlsLabelStyles,
-  controlsSelectStyles,
-  reactflowWrapperStyles,
-  navbarStyles,
-} from './styles'; // import the styles
-import { debounce } from 'lodash';
+import MockAdapter from 'axios-mock-adapter';
+import WrappedApp from './App';
+import { NodeData } from './App'; // Import the NodeData interface if needed
 
-interface NodeData {
-  node: string;
-  type?: string;
-  value?: string;
-  graphDepth: number;
-  parentNode?: string | null;
-}
+const mock = new MockAdapter(axios);
 
-const initialNodes: Node[] = [];
-const initialEdges: Edge[] = [];
+const mockNodeData: NodeData[] = [
+  { node: '1', type: 'input', value: 'root', graphDepth: 0 },
+  { node: '2', parentNode: '1', value: 'child1', graphDepth: 1 },
+  { node: '3', parentNode: '1', value: 'child2', graphDepth: 1 },
+];
 
-const dagreGraph = new dagre.graphlib.Graph();
-dagreGraph.setDefaultEdgeLabel(() => ({}));
+beforeEach(() => {
+  mock.onGet('https://api.example.com/nodes').reply(200, mockNodeData);
+});
 
-const getLayoutedNodes = (nodes: Node[], edges: Edge[], direction = 'TB') => {
-  const nodeWidth = 172;
-  const nodeHeight = 36;
+afterEach(() => {
+  mock.reset();
+});
 
-  dagreGraph.setGraph({ rankdir: direction });
+describe('App Component', () => {
+  describe('Initial Render and Data Fetch', () => {
+    it('should render without crashing and fetch nodes', async () => {
+      render(<WrappedApp />);
 
-  nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
+      await waitFor(() => {
+        expect(screen.getByLabelText('Direction:')).toBeInTheDocument();
+      });
+
+      await waitFor(() => {
+        const nodeElements = screen.getAllByText('1');
+        expect(nodeElements.length).toBeGreaterThan(0);
+      });
+    });
   });
 
-  edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target);
+  describe('Layout Direction', () => {
+    it('should change layout direction', async () => {
+      render(<WrappedApp />);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Direction:')).toBeInTheDocument();
+      });
+
+      fireEvent.change(screen.getByLabelText('Direction:'), { target: { value: 'LR' } });
+
+      expect(screen.getByLabelText('Direction:')).toHaveValue('LR');
+    });
   });
 
-  dagre.layout(dagreGraph);
+  describe('Parent Node Selection', () => {
+    it('should change parent node', async () => {
+      render(<WrappedApp />);
 
-  return nodes.map((node) => {
-    const nodeWithPosition = dagreGraph.node(node.id);
-    node.position = {
-      x: nodeWithPosition.x - nodeWidth / 2,
-      y: nodeWithPosition.y - nodeHeight / 2,
-    };
-    return node;
+      await waitFor(() => {
+        expect(screen.getByLabelText('Parent Node:')).toBeInTheDocument();
+      });
+
+      fireEvent.change(screen.getByLabelText('Parent Node:'), { target: { value: '1' } });
+
+      expect(screen.getByLabelText('Parent Node:')).toHaveValue('1');
+    });
   });
-};
 
-const getNodeColor = (type: string) => {
-  switch (type) {
-    case 'input':
-      return '#FFD700'; // Gold
-    case 'output':
-      return '#FF6347'; // Tomato
-    case 'option':
-      return '#40E0D0'; // Turquoise
-    default:
-      return '#D3D3D3'; // Light Gray
-  }
-};
+  describe('Node Expansion and Collapse', () => {
+    it('should expand nodes on click', async () => {
+      render(<WrappedApp />);
 
-const MAX_EXPANSION_DEPTH = 3;
+      await waitFor(() => {
+        const nodeElements = screen.getAllByText('1');
+        expect(nodeElements.length).toBeGreaterThan(0);
+      });
 
-const App: React.FC = () => {
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
-  const [allNodes, setAllNodes] = useState<Node[]>([]);
-  const [allEdges, setAllEdges] = useState<Edge[]>([]);
-  const [direction, setDirection] = useState('TB');
-  const [selectedParentNode, setSelectedParentNode] = useState<string>('');
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+      const nodeElements = screen.getAllByText('1');
+      fireEvent.click(nodeElements[0]);
 
-  useEffect(() => {
-    const fetchNodes = async () => {
-      try {
-        const response = await axios.get<NodeData[]>('https://api.example.com/nodes');
-        const data = response.data;
-        const processedNodes: Node[] = data.map((item) => ({
-          id: item.node,
-          type: item.type || 'default',
-          data: {
-            label: item.node,
-            value: item.value,
-            graphdepth: item.graphDepth,
-            parentNode: item.parentNode,
-          },
-          position: { x: 0, y: 0 },
-          draggable: true,
-          hidden: true,
-          style: { backgroundColor: getNodeColor(item.type || 'default') },
-        }));
+      await waitFor(() => {
+        const child1Elements = screen.getAllByText('2');
+        const child2Elements = screen.getAllByText('3');
+        expect(child1Elements.length).toBeGreaterThan(0);
+        expect(child2Elements.length).toBeGreaterThan(0);
+      });
+    });
 
-        const processedEdges: Edge[] = data
-          .filter((item) => item.parentNode)
-          .map((item) => ({
-            id: `e-${item.parentNode}-${item.node}`,
-            source: item.parentNode as string,
-            target: item.node,
-          }));
+    it('should collapse nodes on second click', async () => {
+      render(<WrappedApp />);
 
-        setAllNodes(processedNodes);
-        setAllEdges(processedEdges);
+      await waitFor(() => {
+        const nodeElements = screen.getAllByText('1');
+        expect(nodeElements.length).toBeGreaterThan(0);
+      });
 
-        // Set the first node (root node) as the initial node
-        if (processedNodes.length > 0) {
-          setNodes([{ ...processedNodes[0], hidden: false }]);
-        }
-      } catch (error) {
-        console.error('Error fetching node data', error);
-      }
-    };
+      const nodeElements = screen.getAllByText('1');
+      fireEvent.click(nodeElements[0]);
 
-    fetchNodes();
-  }, [setNodes]);
+      await waitFor(() => {
+        const child1Elements = screen.getAllByText('2');
+        const child2Elements = screen.getAllByText('3');
+        expect(child1Elements.length).toBeGreaterThan(0);
+        expect(child2Elements.length).toBeGreaterThan(0);
+      });
 
-  const expandNode = useCallback(
-    (node: Node, currentDepth: number) => {
-      if (currentDepth >= MAX_EXPANSION_DEPTH) return;
+      fireEvent.click(nodeElements[0]);
 
-      const childNodes = allNodes.filter((n) => n.data.parentNode === node.id);
-      if (childNodes.length > 0) {
-        const newNodes = [...nodes];
-        const newEdges = [...edges];
-
-        childNodes.forEach((child) => {
-          if (!newNodes.find((n) => n.id === child.id)) {
-            const position = {
-              x: node.position.x + (Math.random() - 0.5) * 200,
-              y: node.position.y + 100,
-            };
-            newNodes.push({
-              ...child,
-              position,
-              hidden: false,
-            });
-
-            newEdges.push({
-              id: `${node.id}-${child.id}`,
-              source: node.id,
-              target: child.id,
-              type: 'smoothstep',
-              animated: false,
-            });
-
-            if (expandedNodes.has(child.id)) {
-              expandNode(child, currentDepth + 1);
-            }
-          }
-        });
-
-        setNodes(newNodes);
-        setEdges(newEdges);
-      }
-    },
-    [allNodes, nodes, edges, expandedNodes]
-  );
-
-  const collapseNode = useCallback(
-    (nodeId: string) => {
-      const collapseDescendants = (id: string) => {
-        const childNodes = allNodes.filter((n) => n.data.parentNode === id);
-        childNodes.forEach((child) => {
-          collapseDescendants(child.id);
-        });
-        setNodes((nds) => nds.filter((n) => n.id !== id));
-        setEdges((eds) => eds.filter((e) => e.source !== id && e.target !== id));
-      };
-      collapseDescendants(nodeId);
-    },
-    [allNodes]
-  );
-
-  const onNodeClick: NodeMouseHandler = useCallback(
-    debounce((event, node) => {
-      const currentExpandedNodes = new Set(expandedNodes);
-
-      if (currentExpandedNodes.has(node.id)) {
-        // Collapse the node
-        currentExpandedNodes.delete(node.id);
-        collapseNode(node.id);
-      } else {
-        // Expand the node
-        currentExpandedNodes.add(node.id);
-        expandNode(node, 0);
-      }
-
-      setExpandedNodes(currentExpandedNodes);
-    }, 300),
-    [expandedNodes, collapseNode, expandNode]
-  );
-
-  const onConnect = useCallback(
-    (params: Edge | Connection) => setEdges((eds) => addEdge(params, eds)),
-    [setEdges]
-  );
-
-  useEffect(() => {
-    setNodes((nds) => getLayoutedNodes(nds, edges, direction));
-  }, [edges, direction]);
-
-  const handleParentNodeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedNodeId = e.target.value;
-    setSelectedParentNode(selectedNodeId);
-    const selectedNode = allNodes.find((node) => node.id === selectedNodeId);
-    if (selectedNode) {
-      setNodes([{ ...selectedNode, hidden: false }]);
-      setEdges([]);
-    }
-  };
-
-  // Get unique parent nodes for the dropdown
-  const uniqueParentNodes = Array.from(new Set(allNodes.map((node) => node.data.parentNode))).filter(Boolean) as string[];
-
-  return (
-    <div style={graphContainerStyles}>
-      <div style={navbarStyles}>
-        <label style={controlsLabelStyles}>
-          Direction:
-          <select
-            style={controlsSelectStyles}
-            value={direction}
-            onChange={(e) => setDirection(e.target.value)}
-          >
-            <option value="TB">Top-Bottom</option>
-            <option value="BT">Bottom-Top</option>
-            <option value="LR">Left-Right</option>
-            <option value="RL">Right-Left</option>
-          </select>
-        </label>
-        <label style={controlsLabelStyles}>
-          Parent Node:
-          <select
-            style={controlsSelectStyles}
-            value={selectedParentNode}
-            onChange={handleParentNodeChange}
-          >
-            {uniqueParentNodes.map((nodeId) => {
-              const node = allNodes.find((n) => n.id === nodeId);
-              return node ? (
-                <option key={node.id} value={node.id}>
-                  {node.data.label}
-                </option>
-              ) : null;
-            })}
-          </select>
-        </label>
-      </div>
-      <div style={reactflowWrapperStyles}>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onNodeClick={onNodeClick}
-          onConnect={onConnect}
-          fitView
-        >
-          <Controls />
-          <MiniMap />
-          <Background variant="dots" gap={12} size={1} />
-        </ReactFlow>
-      </div>
-    </div>
-  );
-};
-
-const WrappedApp: React.FC = () => (
-  <ReactFlowProvider>
-    <App />
-  </ReactFlowProvider>
-);
-
-export default WrappedApp;
+      await waitFor(() => {
+        expect(screen.queryByText('2')).not.toBeInTheDocument();
+        expect(screen.queryByText('3')).not.toBeInTheDocument();
+      });
+    });
+  });
+});
