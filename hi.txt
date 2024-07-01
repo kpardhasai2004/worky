@@ -1,434 +1,92 @@
-import React, { useState, useEffect, useCallback } from "react";
-import ReactFlow, {
-  MiniMap,
-  Controls,
-  Background,
-  useNodes,
-  useEdges,
-  ReactFlowProvider,
-  Node,
-  Edge,
-  useStoreState,
-  useZoomPanHelper,
-} from "react-flow-renderer";
-import "react-flow-renderer/dist/style.css";
-import dagre from "dagre";
-
-interface DataItem {
-  parent_node: string | null;
-  node: string;
-  graph_depth: number;
-  type: string;
-  name: string;
-  value: string;
-}
-
-interface HierarchicalGraphProps {
-  data: DataItem[];
-  sliderValue: number;
-}
-
-const nodeWidth = 172;
-const nodeHeight = 36;
-
-const dagreGraph = new dagre.graphlib.Graph();
-dagreGraph.setDefaultEdgeLabel(() => ({}));
-
-const parseData = (data: DataItem[]) => {
-  const hierarchy: { [key: string]: any } = {};
-
-  data.forEach((item) => {
-    const { parent_node, node, graph_depth, type, name, value } = item;
-
-    if (!hierarchy[node]) {
-      hierarchy[node] = {
-        id: node,
-        label: name,
-        children: [],
-        type,
-        name,
-        value,
-        graph_depth,
-      };
-    }
-
-    if (parent_node) {
-      if (!hierarchy[parent_node]) {
-        hierarchy[parent_node] = { id: parent_node, children: [] };
-      }
-      hierarchy[parent_node].children.push(hierarchy[node]);
-    }
-  });
-
-  return hierarchy;
-};
-
-const getNodeColor = (type: string) => {
-  switch (type) {
-    case "input":
-      return "#FFD700"; // Gold
-    case "output":
-      return "#FF6347"; // Tomato
-    case "option":
-      return "#40E0D0"; // Turquoise
-    default:
-      return "#D3D3D3"; // Light Gray
-  }
-};
-
-const getLayoutedElements = (
-  nodes: Node[],
-  edges: Edge[],
-  direction: string = "TB"
-) => {
-  const isHorizontal = direction === "LR" || direction === "RL";
-  dagreGraph.setGraph({ rankdir: direction });
-
-  nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
-  });
-
-  edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target);
-  });
-
-  dagre.layout(dagreGraph);
-
-  nodes.forEach((node) => {
-    const nodeWithPosition = dagreGraph.node(node.id);
-    (node as any).targetPosition = isHorizontal ? "left" : "top";
-    (node as any).sourcePosition = isHorizontal ? "right" : "bottom";
-
-    node.position = {
-      x: nodeWithPosition.x - nodeWidth / 2,
-      y: nodeWithPosition.y - nodeHeight / 2,
-    };
-
-    return node;
-  });
-
-  return { nodes, edges };
-};
-
-const HierarchicalGraph: React.FC<HierarchicalGraphProps> = ({
-  data,
-  sliderValue,
-}) => {
-  const hierarchy = parseData(data);
-  const initialParentNode = Object.keys(hierarchy)[0];
-  const [selectedParentNode, setSelectedParentNode] = useState(initialParentNode);
-  const initialElements: Node[] = [
-    {
-      id: hierarchy[selectedParentNode].id,
-      type: hierarchy[selectedParentNode].type,
-      data: { label: hierarchy[selectedParentNode].label },
-      position: { x: 0, y: 0 },
-      style: {
-        backgroundColor: getNodeColor(hierarchy[selectedParentNode].type),
-      },
-    },
-  ];
-
-  const nodes = useNodes();
-  const edges = useEdges();
-  const setNodes = useStoreState((store) => store.setElements);
-  const setEdges = useStoreState((store) => store.setElements);
-  const [expandedNodes, setExpandedNodes] = useState<string[]>([]);
-  const [direction, setDirection] = useState("TB");
-  const { project } = useZoomPanHelper();
-
-  const toggleExpandNode = useCallback(
-    (node: Node) => {
-      if (
-        !hierarchy[node.id] ||
-        !hierarchy[node.id].children ||
-        hierarchy[node.id].children.length === 0
-      ) {
-        return;
-      }
-
-      const currentExpandedNodes = new Set(expandedNodes);
-
-      if (currentExpandedNodes.has(node.id)) {
-        // Collapse the node
-        currentExpandedNodes.delete(node.id);
-        // Remove children nodes and their edges
-        const nodesToKeep = nodes.filter(
-          (n) =>
-            !hierarchy[node.id].children.some((child: any) => child.id === n.id)
-        );
-        const edgesToKeep = edges.filter(
-          (e) =>
-            !hierarchy[node.id].children.some(
-              (child: any) => e.source === node.id && e.target === child.id
-            )
-        );
-        setNodes(nodesToKeep);
-        setEdges(edgesToKeep);
-      } else {
-        // Expand the node
-        currentExpandedNodes.add(node.id);
-
-        const newNodes = [...nodes];
-        const newEdges = [...edges];
-
-        hierarchy[node.id].children.forEach((child: any) => {
-          const position = project({
-            x: node.position.x + (Math.random() - 0.5) * 200,
-            y: node.position.y + 100,
-          });
-          newNodes.push({
-            id: child.id,
-            data: { label: child.label },
-            position,
-            style: { backgroundColor: getNodeColor(child.type) },
-            key: child.id, // Add unique key here
-          });
-
-          newEdges.push({
-            id: `${node.id}-${child.id}`,
-            source: node.id,
-            target: child.id,
-            type: "smoothstep",
-            animated: false,
-            key: `${node.id}-${child.id}`, // Add unique key here
-          });
-
-          // Recursively expand child nodes if they are already in the expanded list
-          if (currentExpandedNodes.has(child.id)) {
-            toggleExpandNode(child);
-          }
-        });
-
-        setNodes(newNodes);
-        setEdges(newEdges);
-      }
-
-      setExpandedNodes(Array.from(currentExpandedNodes));
-    },
-    [hierarchy, nodes, edges, expandedNodes, project, setNodes, setEdges]
-  );
-
-  useEffect(() => {
-    const layoutedElements = getLayoutedElements(nodes, edges, direction);
-    setNodes(layoutedElements.nodes);
-    setEdges(layoutedElements.edges);
-  }, [nodes.length, edges.length, sliderValue, direction, setNodes, setEdges]);
-
-  useEffect(() => {
-    const selectedNode = hierarchy[selectedParentNode];
-    if (selectedNode) {
-      const initialElements = [
-        {
-          id: selectedNode.id,
-          type: selectedNode.type,
-          data: { label: selectedNode.label },
-          position: { x: 0, y: 0 },
-          style: { backgroundColor: getNodeColor(selectedNode.type) },
-          key: selectedNode.id, // Add unique key here
-        },
-      ];
-      setNodes(initialElements);
-      setEdges([]);
-      setExpandedNodes([]);
-    }
-  }, [selectedParentNode, hierarchy, setNodes, setEdges]);
-
-  return (
-    <div style={{ height: "100%" }}>
-      <div style={{ marginBottom: "20px" }}>
-        <label style={{ marginRight: "10px" }}>
-          Direction:
-          <select
-            value={direction}
-            onChange={(e) => setDirection(e.target.value)}
-            style={{ marginLeft: "10px" }}
-          >
-            <option value="TB">Top-Bottom</option>
-            <option value="BT">Bottom-Top</option>
-            <option value="LR">Left-Right</option>
-            <option value="RL">Right-Left</option>
-          </select>
-        </label>
-        <label style={{ marginRight: "10px" }}>
-          Parent Node:
-          <select
-            value={selectedParentNode}
-            onChange={(e) => setSelectedParentNode(e.target.value)}
-            style={{ marginLeft: "10px" }}
-          >
-            {Object.keys(hierarchy).map((key) => (
-              <option key={key} value={key}>
-                {hierarchy[key].label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-      <ReactFlow
-        elements={nodes.concat(edges)}
-        onElementsRemove={() => {}}
-        onConnect={() => {}}
-        snapToGrid={true}
-        snapGrid={[15, 15]}
-        defaultZoom={1.5}
-        nodeTypes={{
-          empty: () => null,
-        }}
-        onNodeDoubleClick={(event, node) => {}}
-        onNodeDragStart={(event, node) => {}}
-        onNodeDragStop={(event, node) => {}}
-        onNodeMouseEnter={(event, node) => {}}
-        onNodeMouseLeave={(event, node) => {}}
-        onNodeContextMenu={(event, node) => {}}
-        onSelectionChange={(elements) => {}}
-        onViewportBoxUpdate={(view) => {}}
-        onEdgeUpdate={(oldEdge, newEdge) => {}}
-        onNodeUpdate={(oldNode, newNode) => {}}
-        onPaneClick={(event) => {}}
-        onPaneContextMenu={(event) => {}}
-        onSelectionDragStop={(event) => {}}
-        onLoad={() => {}}
-        onMove={(view) => {}}
-        onSelectionDragStart={(event) => {}}
-        onSelectionDrag={(event) => {}}
-        onElementsAdd={() => {}}
-        onLoadParams={() => {}}
-        onElementClick={(event, element) => {}}
-        onEdgeMouseEnter={(event, edge) => {}}
-        onEdgeMouseLeave={(event, edge) => {}}
-        onNodeClick={(event, node) => toggleExpandNode(node)}
-        connectionLineType="default"
-      >
-        <MiniMap
-          nodeColor={(n) => {
-            if (n.type === "input") return "#FFD700";
-            if (n.type === "output") return "#FF6347";
-            if (n.type === "option") return "#40E0D0";
-            return "#D3D3D3";
-          }}
-          nodeStrokeWidth={3}
-          maskColor="rgba(0,0,0,0.2)"
-          style={{ width: "200px", height: "100px" }}
-        />
-        <Controls />
-        <Background />
-      </ReactFlow>
-    </div>
-  );
-};
-
-const GraphWithProvider: React.FC<HierarchicalGraphProps> = (props) => (
-  <ReactFlowProvider>
-    <HierarchicalGraph {...props} />
-  </ReactFlowProvider>
-);
-
-export default GraphWithProvider;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-import React, { useState, useEffect } from "react";
-import axios from "axios";
-import GraphWithProvider from "./components/HierarchicalGraph";
-
-const controlsStyles = {
-  marginBottom: "20px",
-};
-
-const controlsLabelStyles = {
-  marginRight: "10px",
-};
-
-const controlsInputStyles = {
-  marginRight: "10px",
-};
-
-const controlsSpanStyles = {
-  fontWeight: "bold",
-};
-
-const graphContainerStyles = {
-  height: "calc(100vh - 50px)", // Adjust the height based on your controls' height
-  overflow: "hidden",
-};
-
-const App: React.FC = () => {
-  const [sliderValue, setSliderValue] = useState<number>(0);
-  const [data, setData] = useState<DataItem[]>([]); // Adjust the type as per your data structure
-
-  useEffect(() => {
-    // Axios GET request to fetch data
-    axios
-      .get("http://localhost:8100/api/data")
-      .then((response) => {
-        // Extract and flatten the arrays from the JSON structure
-        const dataArray = Object.values(response.data).flat(); // Adjust based on your actual API response structure
-
-        // Optionally, parse or process data fields
-        const processedData = dataArray.map((item: any) => ({
-          ...item,
-          graph_depth: parseInt(item.graph_depth, 10), // Convert graph_depth to number if needed
-        }));
-
-        setData(processedData);
-      })
-      .catch((error) => {
-        console.error("Error fetching data:", error);
+// App.test.tsx
+import React from 'react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import '@testing-library/jest-dom/extend-expect';
+import axios from 'axios';
+import MockAdapter from 'axios-mock-adapter';
+import WrappedApp from './App';
+import { NodeData } from './App'; // Import the NodeData interface if needed
+
+const mock = new MockAdapter(axios);
+
+const mockNodeData: NodeData[] = [
+  { node: '1', type: 'input', value: 'root', graphDepth: 0 },
+  { node: '2', parentNode: '1', value: 'child1', graphDepth: 1 },
+  { node: '3', parentNode: '1', value: 'child2', graphDepth: 1 },
+];
+
+beforeEach(() => {
+  mock.onGet('https://api.example.com/nodes').reply(200, mockNodeData);
+});
+
+afterEach(() => {
+  mock.reset();
+});
+
+describe('App Component', () => {
+  describe('Initial Render and Data Fetch', () => {
+    test('renders without crashing and fetches nodes', async () => {
+      render(<WrappedApp />);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Direction:')).toBeInTheDocument();
       });
-  }, []); // Empty dependency array ensures this effect runs only once on mount
 
-  return (
-    <div style={{ height: "100vh", overflow: "hidden" }}>
-      <div style={controlsStyles}>
-        <label style={controlsLabelStyles}>
-          Slider Value:
-          <input
-            type="range"
-            min="0"
-            max="100"
-            value={sliderValue}
-            onChange={(e) => setSliderValue(parseInt(e.target.value, 10))}
-            style={controlsInputStyles}
-          />
-          <span style={controlsSpanStyles}>{sliderValue}</span>
-        </label>
-      </div>
-      <div style={graphContainerStyles}>
-        <GraphWithProvider data={data} sliderValue={sliderValue} />
-      </div>
-    </div>
-  );
-};
+      await waitFor(() => {
+        expect(screen.getByText('1')).toBeInTheDocument();
+      });
+    });
+  });
 
-export default App;
+  describe('Layout Direction', () => {
+    test('changes layout direction', async () => {
+      render(<WrappedApp />);
 
+      await waitFor(() => {
+        expect(screen.getByLabelText('Direction:')).toBeInTheDocument();
+      });
 
+      fireEvent.change(screen.getByLabelText('Direction:'), { target: { value: 'LR' } });
 
+      expect(screen.getByLabelText('Direction:')).toHaveValue('LR');
+    });
+  });
 
+  describe('Parent Node Selection', () => {
+    test('changes parent node', async () => {
+      render(<WrappedApp />);
 
+      await waitFor(() => {
+        expect(screen.getByLabelText('Parent Node:')).toBeInTheDocument();
+      });
 
+      fireEvent.change(screen.getByLabelText('Parent Node:'), { target: { value: '1' } });
+
+      expect(screen.getByLabelText('Parent Node:')).toHaveValue('1');
+    });
+  });
+
+  describe('Node Expansion and Collapse', () => {
+    test('expands and collapses nodes on click', async () => {
+      render(<WrappedApp />);
+
+      await waitFor(() => {
+        expect(screen.getByText('1')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('1'));
+
+      await waitFor(() => {
+        expect(screen.getByText('2')).toBeInTheDocument();
+        expect(screen.getByText('3')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('1'));
+
+      await waitFor(() => {
+        expect(screen.queryByText('2')).not.toBeInTheDocument();
+        expect(screen.queryByText('3')).not.toBeInTheDocument();
+      });
+    });
+  });
+});
