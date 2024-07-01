@@ -22,6 +22,7 @@ import {
   reactflowWrapperStyles,
   navbarStyles,
 } from './styles'; // import the styles
+import { debounce } from 'lodash';
 
 interface NodeData {
   node: string;
@@ -76,6 +77,8 @@ const getNodeColor = (type: string) => {
   }
 };
 
+const MAX_EXPANSION_DEPTH = 3;
+
 const App: React.FC = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
@@ -129,7 +132,9 @@ const App: React.FC = () => {
   }, [setNodes]);
 
   const expandNode = useCallback(
-    (node: Node) => {
+    (node: Node, currentDepth: number) => {
+      if (currentDepth >= MAX_EXPANSION_DEPTH) return;
+
       const childNodes = allNodes.filter((n) => n.data.parentNode === node.id);
       if (childNodes.length > 0) {
         const newNodes = [...nodes];
@@ -156,7 +161,7 @@ const App: React.FC = () => {
             });
 
             if (expandedNodes.has(child.id)) {
-              expandNode(child);
+              expandNode(child, currentDepth + 1);
             }
           }
         });
@@ -184,7 +189,7 @@ const App: React.FC = () => {
   );
 
   const onNodeClick: NodeMouseHandler = useCallback(
-    (event, node) => {
+    debounce((event, node) => {
       const currentExpandedNodes = new Set(expandedNodes);
 
       if (currentExpandedNodes.has(node.id)) {
@@ -194,11 +199,11 @@ const App: React.FC = () => {
       } else {
         // Expand the node
         currentExpandedNodes.add(node.id);
-        expandNode(node);
+        expandNode(node, 0);
       }
 
       setExpandedNodes(currentExpandedNodes);
-    },
+    }, 300),
     [expandedNodes, collapseNode, expandNode]
   );
 
@@ -280,3 +285,7 @@ const App: React.FC = () => {
 const WrappedApp: React.FC = () => (
   <ReactFlowProvider>
     <App />
+  </ReactFlowProvider>
+);
+
+export default WrappedApp;
