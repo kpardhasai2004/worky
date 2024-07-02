@@ -3,21 +3,22 @@ describe('Node Expansion and Collapse', () => {
     render(<WrappedApp />);
 
     await waitFor(() => {
-      const nodeElements = screen.getAllByText('1');
-      expect(nodeElements.length).toBeGreaterThan(0);
+      // Ensure the node with text '1' is in the document
+      expect(screen.getAllByText('1').length).toBeGreaterThan(0);
     });
 
-    const nodeElement = document.querySelector('.react-flow__node');
+    // Find the first node element with the text '1'
+    const nodeElements = screen.getAllByText('1');
+    const nodeElement = nodeElements[0].closest('.react-flow__node');
 
     if (nodeElement) {
       fireEvent.click(nodeElement);
     }
 
     await waitFor(() => {
-      const child1Elements = screen.getAllByText('2');
-      const child2Elements = screen.getAllByText('3');
-      expect(child1Elements.length).toBeGreaterThan(0);
-      expect(child2Elements.length).toBeGreaterThan(0);
+      // Check for child nodes with texts '2' and '3'
+      expect(screen.getAllByText('2').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('3').length).toBeGreaterThan(0);
     });
   });
 
@@ -25,21 +26,22 @@ describe('Node Expansion and Collapse', () => {
     render(<WrappedApp />);
 
     await waitFor(() => {
-      const nodeElements = screen.getAllByText('1');
-      expect(nodeElements.length).toBeGreaterThan(0);
+      // Ensure the node with text '1' is in the document
+      expect(screen.getAllByText('1').length).toBeGreaterThan(0);
     });
 
-    const nodeElement = document.querySelector('.react-flow__node');
+    // Find the first node element with the text '1'
+    const nodeElements = screen.getAllByText('1');
+    const nodeElement = nodeElements[0].closest('.react-flow__node');
 
     if (nodeElement) {
       fireEvent.click(nodeElement);
     }
 
     await waitFor(() => {
-      const child1Elements = screen.getAllByText('2');
-      const child2Elements = screen.getAllByText('3');
-      expect(child1Elements.length).toBeGreaterThan(0);
-      expect(child2Elements.length).toBeGreaterThan(0);
+      // Check for child nodes with texts '2' and '3'
+      expect(screen.getAllByText('2').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('3').length).toBeGreaterThan(0);
     });
 
     if (nodeElement) {
@@ -47,5 +49,6 @@ describe('Node Expansion and Collapse', () => {
     }
 
     await waitFor(() => {
+      // Ensure the child nodes are no longer in the document
       expect(screen.queryByText('2')).not.toBeInTheDocument();
       expect(screen.queryByText('3')).not.toBeInTheDocument();
