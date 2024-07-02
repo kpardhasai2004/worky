@@ -1,116 +1,51 @@
-// App.test.tsx
-import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import '@testing-library/jest-dom/extend-expect';
-import axios from 'axios';
-import MockAdapter from 'axios-mock-adapter';
-import WrappedApp from './App';
-import { NodeData } from './App'; // Import the NodeData interface if needed
+describe('Node Expansion and Collapse', () => {
+  it('should expand nodes on click', async () => {
+    render(<WrappedApp />);
 
-const mock = new MockAdapter(axios);
-
-const mockNodeData: NodeData[] = [
-  { node: '1', type: 'input', value: 'root', graphDepth: 0 },
-  { node: '2', parentNode: '1', value: 'child1', graphDepth: 1 },
-  { node: '3', parentNode: '1', value: 'child2', graphDepth: 1 },
-];
-
-beforeEach(() => {
-  mock.onGet('https://api.example.com/nodes').reply(200, mockNodeData);
-});
-
-afterEach(() => {
-  mock.reset();
-});
-
-describe('App Component', () => {
-  describe('Initial Render and Data Fetch', () => {
-    it('should render without crashing and fetch nodes', async () => {
-      render(<WrappedApp />);
-
-      await waitFor(() => {
-        expect(screen.getByLabelText('Direction:')).toBeInTheDocument();
-      });
-
-      await waitFor(() => {
-        const nodeElements = screen.getAllByText('1');
-        expect(nodeElements.length).toBeGreaterThan(0);
-      });
-    });
-  });
-
-  describe('Layout Direction', () => {
-    it('should change layout direction', async () => {
-      render(<WrappedApp />);
-
-      await waitFor(() => {
-        expect(screen.getByLabelText('Direction:')).toBeInTheDocument();
-      });
-
-      fireEvent.change(screen.getByLabelText('Direction:'), { target: { value: 'LR' } });
-
-      expect(screen.getByLabelText('Direction:')).toHaveValue('LR');
-    });
-  });
-
-  describe('Parent Node Selection', () => {
-    it('should change parent node', async () => {
-      render(<WrappedApp />);
-
-      await waitFor(() => {
-        expect(screen.getByLabelText('Parent Node:')).toBeInTheDocument();
-      });
-
-      fireEvent.change(screen.getByLabelText('Parent Node:'), { target: { value: '1' } });
-
-      expect(screen.getByLabelText('Parent Node:')).toHaveValue('1');
-    });
-  });
-
-  describe('Node Expansion and Collapse', () => {
-    it('should expand nodes on click', async () => {
-      render(<WrappedApp />);
-
-      await waitFor(() => {
-        const nodeElements = screen.getAllByText('1');
-        expect(nodeElements.length).toBeGreaterThan(0);
-      });
-
+    await waitFor(() => {
       const nodeElements = screen.getAllByText('1');
-      fireEvent.click(nodeElements[0]);
-
-      await waitFor(() => {
-        const child1Elements = screen.getAllByText('2');
-        const child2Elements = screen.getAllByText('3');
-        expect(child1Elements.length).toBeGreaterThan(0);
-        expect(child2Elements.length).toBeGreaterThan(0);
-      });
+      expect(nodeElements.length).toBeGreaterThan(0);
     });
 
-    it('should collapse nodes on second click', async () => {
-      render(<WrappedApp />);
+    const nodeElement = document.querySelector('.react-flow__node');
 
-      await waitFor(() => {
-        const nodeElements = screen.getAllByText('1');
-        expect(nodeElements.length).toBeGreaterThan(0);
-      });
+    if (nodeElement) {
+      fireEvent.click(nodeElement);
+    }
 
-      const nodeElements = screen.getAllByText('1');
-      fireEvent.click(nodeElements[0]);
-
-      await waitFor(() => {
-        const child1Elements = screen.getAllByText('2');
-        const child2Elements = screen.getAllByText('3');
-        expect(child1Elements.length).toBeGreaterThan(0);
-        expect(child2Elements.length).toBeGreaterThan(0);
-      });
-
-      fireEvent.click(nodeElements[0]);
-
-      await waitFor(() => {
-        expect(screen.queryByText('2')).not.toBeInTheDocument();
-        expect(screen.queryByText('3')).not.toBeInTheDocument();
-      });
+    await waitFor(() => {
+      const child1Elements = screen.getAllByText('2');
+      const child2Elements = screen.getAllByText('3');
+      expect(child1Elements.length).toBeGreaterThan(0);
+      expect(child2Elements.length).toBeGreaterThan(0);
     });
   });
-});
+
+  it('should collapse nodes on second click', async () => {
+    render(<WrappedApp />);
+
+    await waitFor(() => {
+      const nodeElements = screen.getAllByText('1');
+      expect(nodeElements.length).toBeGreaterThan(0);
+    });
+
+    const nodeElement = document.querySelector('.react-flow__node');
+
+    if (nodeElement) {
+      fireEvent.click(nodeElement);
+    }
+
+    await waitFor(() => {
+      const child1Elements = screen.getAllByText('2');
+      const child2Elements = screen.getAllByText('3');
+      expect(child1Elements.length).toBeGreaterThan(0);
+      expect(child2Elements.length).toBeGreaterThan(0);
+    });
+
+    if (nodeElement) {
+      fireEvent.click(nodeElement);
+    }
+
+    await waitFor(() => {
+      expect(screen.queryByText('2')).not.toBeInTheDocument();
+      expect(screen.queryByText('3')).not.toBeInTheDocument();
