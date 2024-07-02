@@ -1,54 +1,85 @@
+import React from 'react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import '@testing-library/jest-dom/extend-expect';
+import axios from 'axios';
+import MockAdapter from 'axios-mock-adapter';
+import WrappedApp from './App'; // Assuming your main component file is App.tsx
+import { NodeData } from './App'; // Import the NodeData interface if needed
+
+// Setup axios mock
+const mock = new MockAdapter(axios);
+
+const mockNodeData: NodeData[] = [
+  { node: '1', type: 'input', value: 'root', graphDepth: 0 },
+  { node: '2', parentNode: '1', value: 'child1', graphDepth: 1 },
+  { node: '3', parentNode: '1', value: 'child2', graphDepth: 1 },
+];
+
+beforeEach(() => {
+  mock.onGet('https://api.example.com/nodes').reply(200, mockNodeData);
+});
+
+afterEach(() => {
+  mock.reset();
+});
+
 describe('Node Expansion and Collapse', () => {
   it('should expand nodes on click', async () => {
     render(<WrappedApp />);
 
+    // Ensure the node with text '1' is in the document
     await waitFor(() => {
-      // Ensure the node with text '1' is in the document
-      expect(screen.getAllByText('1').length).toBeGreaterThan(0);
+      const nodeElement = screen.getByText('1');
+      expect(nodeElement).toBeInTheDocument();
     });
 
-    // Find the first node element with the text '1'
-    const nodeElements = screen.getAllByText('1');
-    const nodeElement = nodeElements[0].closest('.react-flow__node');
+    // Find the node element with the text '1'
+    const nodeElement = screen.getByText('1').closest('.react-flow__node');
+    expect(nodeElement).toBeInTheDocument();
 
-    if (nodeElement) {
-      fireEvent.click(nodeElement);
-    }
+    // Click the node with text '1'
+    fireEvent.click(nodeElement!);
 
+    // Check for child nodes with texts '2' and '3'
     await waitFor(() => {
-      // Check for child nodes with texts '2' and '3'
-      expect(screen.getAllByText('2').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('3').length).toBeGreaterThan(0);
+      const child1Element = screen.getByText('2');
+      const child2Element = screen.getByText('3');
+      expect(child1Element).toBeInTheDocument();
+      expect(child2Element).toBeInTheDocument();
     });
   });
 
   it('should collapse nodes on second click', async () => {
     render(<WrappedApp />);
 
+    // Ensure the node with text '1' is in the document
     await waitFor(() => {
-      // Ensure the node with text '1' is in the document
-      expect(screen.getAllByText('1').length).toBeGreaterThan(0);
+      const nodeElement = screen.getByText('1');
+      expect(nodeElement).toBeInTheDocument();
     });
 
-    // Find the first node element with the text '1'
-    const nodeElements = screen.getAllByText('1');
-    const nodeElement = nodeElements[0].closest('.react-flow__node');
+    // Find the node element with the text '1'
+    const nodeElement = screen.getByText('1').closest('.react-flow__node');
+    expect(nodeElement).toBeInTheDocument();
 
-    if (nodeElement) {
-      fireEvent.click(nodeElement);
-    }
+    // Click the node with text '1' to expand it
+    fireEvent.click(nodeElement!);
 
+    // Check for child nodes with texts '2' and '3'
     await waitFor(() => {
-      // Check for child nodes with texts '2' and '3'
-      expect(screen.getAllByText('2').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('3').length).toBeGreaterThan(0);
+      const child1Element = screen.getByText('2');
+      const child2Element = screen.getByText('3');
+      expect(child1Element).toBeInTheDocument();
+      expect(child2Element).toBeInTheDocument();
     });
 
-    if (nodeElement) {
-      fireEvent.click(nodeElement);
-    }
+    // Click the node with text '1' again to collapse it
+    fireEvent.click(nodeElement!);
 
+    // Ensure the child nodes are no longer in the document
     await waitFor(() => {
-      // Ensure the child nodes are no longer in the document
       expect(screen.queryByText('2')).not.toBeInTheDocument();
       expect(screen.queryByText('3')).not.toBeInTheDocument();
+    });
+  });
+});
