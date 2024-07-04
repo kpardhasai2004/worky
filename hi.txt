@@ -31,7 +31,11 @@ const getLayoutedNodes = (nodes: Node[], edges: Edge[]) => {
   const width = 800; // Example width, adjust as necessary
   const height = 600; // Example height, adjust as necessary
 
-  const nodeMap = new Map(nodes.map(node => [node.id, node]));
+  // Validate root node
+  const rootNodes = nodes.filter(node => node.data.parentNode === null);
+  if (rootNodes.length !== 1) {
+    throw new Error("There should be exactly one root node.");
+  }
 
   // Create a hierarchical structure
   const root = d3.stratify<Node>()
@@ -43,6 +47,7 @@ const getLayoutedNodes = (nodes: Node[], edges: Edge[]) => {
   const treeData = treeLayout(root);
 
   // Map positions back to nodes
+  const nodeMap = new Map(nodes.map(node => [node.id, node]));
   treeData.each(d => {
     const node = nodeMap.get(d.id);
     if (node) {
@@ -87,4 +92,37 @@ const App: React.FC = () => {
             .filter((item) => item.parentNode)
             .map((item) => ({
               id: `e-${item.parentNode}-${item.node}`,
-              source
+              source: item.parentNode as string,
+              target: item.node,
+            }));
+
+          try {
+            const layoutedNodes = getLayoutedNodes(processedNodes, processedEdges);
+            setAllNodes(layoutedNodes);
+            setAllEdges(processedEdges);
+
+            // Set the first node (root node) as the initial node
+            if (layoutedNodes.length > 0) {
+              setNodes([{ ...layoutedNodes[0], hidden: false }]);
+            }
+          } catch (error) {
+            console.error(error.message);
+          }
+        },
+      });
+    }
+  }, [setNodes]);
+
+  const generateEdges = useCallback((nodeId: string) => {
+    const newEdges = allNodes
+      .filter(node => node.data.parentNode === nodeId)
+      .map(node => ({
+        id: `e-${node.data.parentNode}-${node.id}`,
+        source: node.data.parentNode as string,
+        target: node.id,
+      }));
+    setEdges(prevEdges => [...prevEdges, ...newEdges]);
+  }, [allNodes, setEdges]);
+
+  const onNodeClick: NodeMouseHandler = useCallback((event, node) => {
+    const childNodes = allNodes.filter(n => n.data.parentNode ===
