@@ -1,45 +1,64 @@
+import React, { useState, useCallback } from 'react';
+import ReactFlow, {
+  MiniMap,
+  Controls,
+  Background,
+  addEdge,
+  useNodesState,
+  useEdgesState,
+  ReactFlowProvider,
+  Node,
+  Edge,
+  Connection,
+  NodeMouseHandler,
+} from 'reactflow';
+import 'reactflow/dist/style.css';
+import Papa from 'papaparse';
 import * as d3 from 'd3';
 
-const treeData = {
-  name: 'Root',
-  children: [
-    { name: 'Child 1' },
-    {
-      name: 'Child 2',
-      children: [
-        { name: 'Grandchild 1' },
-        { name: 'Grandchild 2' },
-      ],
-    },
-  ],
+interface NodeData {
+  node: string;
+  type?: string;
+  value?: string;
+  graphDepth: number;
+  parentNode?: string | null;
+}
+
+const initialNodes: Node[] = [];
+const initialEdges: Edge[] = [];
+
+const getLayoutedNodes = (nodes: Node[], edges: Edge[]) => {
+  const width = 800; // Example width, adjust as necessary
+  const height = 600; // Example height, adjust as necessary
+
+  // Create a simple tree layout
+  const root = d3.stratify<Node>()
+    .id((d) => d.id)
+    .parentId((d) => d.data.parentNode)(nodes);
+
+  const treeLayout = d3.tree<Node>().size([width, height]);
+
+  treeLayout(root);
+
+  return nodes.map((node, index) => {
+    const treeNode = root.descendants()[index];
+    node.position = {
+      x: treeNode.x,
+      y: treeNode.y,
+    };
+    return node;
+  });
 };
 
-const width = 500;
-const height = 500;
+const App: React.FC = () => {
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
+  const [allNodes, setAllNodes] = useState<Node[]>([]);
+  const [allEdges, setAllEdges] = useState<Edge[]>([]);
 
-const svg = d3.select('body').append('svg')
-  .attr('width', width)
-  .attr('height', height);
-
-const root = d3.hierarchy(treeData);
-
-const treeLayout = d3.tree().size([width, height]);
-
-treeLayout(root);
-
-svg.selectAll('line')
-  .data(root.links())
-  .enter()
-  .append('line')
-  .attr('x1', (d: any) => d.source.x)
-  .attr('y1', (d: any) => d.source.y)
-  .attr('x2', (d: any) => d.target.x)
-  .attr('y2', (d: any) => d.target.y);
-
-svg.selectAll('circle')
-  .data(root.descendants())
-  .enter()
-  .append('circle')
-  .attr('cx', (d: any) => d.x)
-  .attr('cy', (d: any) => d.y)
-  .attr('r', 5);
+  const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      Papa.parse<NodeData>(file, {
+        header: true,
+        complete: (results) => {
