@@ -31,23 +31,29 @@ const getLayoutedNodes = (nodes: Node[], edges: Edge[]) => {
   const width = 800; // Example width, adjust as necessary
   const height = 600; // Example height, adjust as necessary
 
-  // Create a simple tree layout
+  const nodeMap = new Map(nodes.map(node => [node.id, node]));
+
+  // Create a hierarchical structure
   const root = d3.stratify<Node>()
-    .id((d) => d.id)
-    .parentId((d) => d.data.parentNode)(nodes);
+    .id(d => d.id)
+    .parentId(d => d.data.parentNode)(nodes as any);
 
+  // Create the tree layout
   const treeLayout = d3.tree<Node>().size([width, height]);
+  const treeData = treeLayout(root);
 
-  treeLayout(root);
-
-  return nodes.map((node, index) => {
-    const treeNode = root.descendants()[index];
-    node.position = {
-      x: treeNode.x,
-      y: treeNode.y,
-    };
-    return node;
+  // Map positions back to nodes
+  treeData.each(d => {
+    const node = nodeMap.get(d.id);
+    if (node) {
+      node.position = {
+        x: d.x,
+        y: d.y,
+      };
+    }
   });
+
+  return nodes;
 };
 
 const App: React.FC = () => {
@@ -62,3 +68,23 @@ const App: React.FC = () => {
       Papa.parse<NodeData>(file, {
         header: true,
         complete: (results) => {
+          const data = results.data;
+          const processedNodes: Node[] = data.map((item) => ({
+            id: item.node,
+            type: item.type || 'default',
+            data: {
+              label: item.node,
+              value: item.value,
+              graphdepth: item.graphDepth,
+              parentNode: item.parentNode,
+            },
+            position: { x: 0, y: 0 },
+            draggable: true,
+            hidden: true,
+          }));
+
+          const processedEdges: Edge[] = data
+            .filter((item) => item.parentNode)
+            .map((item) => ({
+              id: `e-${item.parentNode}-${item.node}`,
+              source
