@@ -1,72 +1,24 @@
-import React, { useState, useCallback } from 'react';
-import ReactFlow, {
-  MiniMap,
-  Controls,
-  Background,
-  addEdge,
-  useNodesState,
-  useEdgesState,
-  ReactFlowProvider,
-  Node,
-  Edge,
-  Connection,
-  NodeMouseHandler,
-} from 'reactflow';
-import 'reactflow/dist/style.css';
-import Papa from 'papaparse';
-import * as d3 from 'd3';
+Here's an example of how to use the `dagre.layout()` function with only dagre-d3 in TypeScript:
+```
+import * as d3 from 'dagre-d3';
 
-interface NodeData {
-  node: string;
-  type?: string;
-  value?: string;
-  graphDepth: number;
-  parentNode?: string | null;
-}
+const graph = new d3.Digraph();
+// Add nodes and edges to the graph...
 
-const initialNodes: Node[] = [];
-const initialEdges: Edge[] = [];
+const layout = d3.layout()
+  .graph(graph)
+  .nodes(graph.nodes())
+  .edges(graph.edges())
+  .rankDir('TB') // or 'LR' for left-to-right
+  .nodeSep(30)
+  .edgeSep(30)
+  .rankSep(30)
+  .run();
+```
+In this example, we import dagre-d3 as `d3` and create a new graph using `d3.Digraph()`. We then add nodes and edges to the graph using the `graph.addNode()` and `graph.addEdge()` methods.
 
-const getLayoutedNodes = (nodes: Node[], edges: Edge[]) => {
-  const width = 800; // Example width, adjust as necessary
-  const height = 600; // Example height, adjust as necessary
+Next, we create a new layout object using `d3.layout()` and configure it to use the graph, nodes, and edges. We also set the rank direction, node separation, edge separation, and rank separation.
 
-  // Validate root node
-  const rootNodes = nodes.filter(node => node.data.parentNode === null);
-  if (rootNodes.length !== 1) {
-    throw new Error("There should be exactly one root node.");
-  }
+Finally, we call the `run()` method to perform the layout.
 
-  // Create a hierarchical structure
-  const root = d3.stratify<Node>()
-    .id(d => d.id)
-    .parentId(d => d.data.parentNode)(nodes as any);
-
-  // Create the tree layout
-  const treeLayout = d3.tree<Node>().size([width, height]);
-  const treeData = treeLayout(root);
-
-  // Map positions back to nodes
-  const nodeMap = new Map(nodes.map(node => [node.id, node]));
-  treeData.each(d => {
-    const node = nodeMap.get(d.id);
-    if (node) {
-      node.position = {
-        x: d.x,
-        y: d.y,
-      };
-    }
-  });
-
-  return nodes;
-};
-
-const App: React.FC = () => {
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
-  const [allNodes, setAllNodes] = useState<Node[]>([]);
-  const [allEdges, setAllEdges] = useState<Edge[]>([]);
-
-  const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file)
+Note that the `run()` method returns the laid-out graph, so you can access the node positions and other layout information from the `graph` object.
