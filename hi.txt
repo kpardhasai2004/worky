@@ -1,7 +1,6 @@
 interface Node {
   id: string;
   position?: { x: number; y: number };
-  children?: string[];
 }
 
 interface Edge {
@@ -19,26 +18,29 @@ const getTreeLayoutedNodes = (nodes: Node[], edges: Edge[]): Node[] => {
   const nodeMap: { [key: string]: Node } = {};
   nodes.forEach(node => nodeMap[node.id] = node);
 
-  // Build a tree structure from the edges
+  // Build a parent-children map from the edges
+  const parentMap: { [key: string]: string[] } = {};
   edges.forEach(edge => {
-    const sourceNode = nodeMap[edge.source];
-    if (!sourceNode.children) sourceNode.children = [];
-    sourceNode.children.push(edge.target);
+    if (!parentMap[edge.source]) {
+      parentMap[edge.source] = [];
+    }
+    parentMap[edge.source].push(edge.target);
   });
 
   // Function to calculate positions
-  const calculatePositions = (node: Node, depth: number, position: { x: number; y: number }) => {
+  const calculatePositions = (nodeId: string, depth: number, position: { x: number; y: number }) => {
+    const node = nodeMap[nodeId];
     if (!node) return;
     
     node.position = { x: position.x, y: position.y };
 
-    if (node.children && node.children.length > 0) {
-      const totalWidth = node.children.length * (nodeWidth + horizontalSpacing);
+    const children = parentMap[nodeId];
+    if (children && children.length > 0) {
+      const totalWidth = children.length * (nodeWidth + horizontalSpacing);
       let offsetX = position.x - totalWidth / 2 + nodeWidth / 2;
 
-      node.children.forEach(childId => {
-        const childNode = nodeMap[childId];
-        calculatePositions(childNode, depth + 1, {
+      children.forEach(childId => {
+        calculatePositions(childId, depth + 1, {
           x: offsetX,
           y: position.y + nodeHeight + verticalSpacing
         });
@@ -50,8 +52,7 @@ const getTreeLayoutedNodes = (nodes: Node[], edges: Edge[]): Node[] => {
   // Find the root node (assumed to be the one without incoming edges)
   const rootNodeId = nodes.find(node => !edges.some(edge => edge.target === node.id))?.id;
   if (rootNodeId) {
-    const rootNode = nodeMap[rootNodeId];
-    calculatePositions(rootNode, 0, { x: 0, y: 0 });
+    calculatePositions(rootNodeId, 0, { x: 0, y: 0 });
   }
 
   return nodes;
