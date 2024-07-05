@@ -1,24 +1,140 @@
-Here's an example of how to use the `dagre.layout()` function with only dagre-d3 in TypeScript:
-```
-import * as d3 from 'dagre-d3';
+import React, { useState, useCallback } from 'react';
+import ReactFlow, {
+  MiniMap,
+  Controls,
+  Background,
+  addEdge,
+  useNodesState,
+  useEdgesState,
+  ReactFlowProvider,
+  Node,
+  Edge,
+  Connection,
+  NodeMouseHandler,
+} from 'reactflow';
+import 'reactflow/dist/style.css';
+import Papa from 'papaparse';
 
-const graph = new d3.Digraph();
-// Add nodes and edges to the graph...
+interface NodeData {
+  node: string;
+  type?: string;
+  value?: string;
+  graphDepth: number;
+  parentNode?: string | null;
+}
 
-const layout = d3.layout()
-  .graph(graph)
-  .nodes(graph.nodes())
-  .edges(graph.edges())
-  .rankDir('TB') // or 'LR' for left-to-right
-  .nodeSep(30)
-  .edgeSep(30)
-  .rankSep(30)
-  .run();
-```
-In this example, we import dagre-d3 as `d3` and create a new graph using `d3.Digraph()`. We then add nodes and edges to the graph using the `graph.addNode()` and `graph.addEdge()` methods.
+const initialNodes: Node[] = [];
 
-Next, we create a new layout object using `d3.layout()` and configure it to use the graph, nodes, and edges. We also set the rank direction, node separation, edge separation, and rank separation.
+const initialEdges: Edge[] = [];
 
-Finally, we call the `run()` method to perform the layout.
+const App: React.FC = () => {
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
+  const [allNodes, setAllNodes] = useState<Node[]>([]);
+  const [allEdges, setAllEdges] = useState<Edge[]>([]);
 
-Note that the `run()` method returns the laid-out graph, so you can access the node positions and other layout information from the `graph` object.
+  const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      Papa.parse<NodeData>(file, {
+        header: true,
+        complete: (results) => {
+          const data = results.data;
+          const processedNodes: Node[] = data.map((item) => ({
+            id: item.node,
+            type: item.type || 'default',
+            data: {
+              label: item.node,
+              value: item.value,
+              graphdepth: item.graphDepth,
+              parentNode: item.parentNode,
+            },
+            position: { x: 0, y: 0 },
+            draggable: true,
+            hidden: true,
+          }));
+
+          const processedEdges: Edge[] = data
+            .filter((item) => item.parentNode)
+            .map((item) => ({
+              id: `e-${item.parentNode}-${item.node}`,
+              source: item.parentNode as string,
+              target: item.node,
+            }));
+
+          setAllNodes(processedNodes);
+          setAllEdges(processedEdges);
+
+          // Set the first node (root node) as the initial node
+          if (processedNodes.length > 0) {
+            setNodes([{ ...processedNodes[0], hidden: false }]);
+          }
+        },
+      });
+    }
+  }, [setNodes]);
+
+  const generateEdges = useCallback((nodeId: string) => {
+    const newEdges = allNodes
+      .filter(node => node.data.parentNode === nodeId)
+      .map(node => ({
+        id: `e-${node.data.parentNode}-${node.id}`,
+        source: node.data.parentNode as string,
+        target: node.id,
+      }));
+    setEdges(prevEdges => [...prevEdges, ...newEdges]);
+  }, [allNodes, setEdges]);
+
+  const onNodeClick: NodeMouseHandler = useCallback((event, node) => {
+    const childNodes = allNodes.filter(n => n.data.parentNode === node.id && n.hidden);
+    if (childNodes.length > 0) {
+      childNodes.forEach(child => {
+        child.position = {
+          x: node.position.x + 200,
+          y: node.position.y + 100 * childNodes.indexOf(child),
+        };
+        child.hidden = false;
+      });
+      setNodes(prevNodes => [...prevNodes, ...childNodes]);
+      generateEdges(node.id);
+    }
+    setNodes(prevNodes =>
+      prevNodes.map(n =>
+        n.id === node.id ? { ...n, hidden: false } : n
+      )
+    );
+  }, [allNodes, generateEdges]);
+
+  const onConnect = useCallback(
+    (params: Edge | Connection) => setEdges((eds) => addEdge(params, eds)),
+    [setEdges]
+  );
+
+  return (
+    <div style={{ width: '100vw', height: '100vh' }}>
+      <input type="file" accept=".csv" onChange={handleFileUpload} />
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onNodeClick={onNodeClick}
+        onConnect={onConnect}
+        fitView
+      >
+        <Controls />
+        <MiniMap />
+        <Background variant="dots" gap={12} size={1} />
+      </ReactFlow>
+    </div>
+  );
+};
+
+const WrappedApp: React.FC = () => (
+  <ReactFlowProvider>
+    <App />
+  </ReactFlowProvider>
+);
+
+export default WrappedApp;
+This is my working code can you add dagre graph for layout
