@@ -1,6 +1,7 @@
 interface Node {
   id: string;
   position?: { x: number; y: number };
+  children?: string[];
 }
 
 interface Edge {
@@ -8,39 +9,50 @@ interface Edge {
   target: string;
 }
 
-const getCustomLayoutedNodes = (nodes: Node[], edges: Edge[]): Node[] => {
+const getTreeLayoutedNodes = (nodes: Node[], edges: Edge[]): Node[] => {
   const nodeWidth = 172;
   const nodeHeight = 36;
   const verticalSpacing = 50;
   const horizontalSpacing = 100;
 
-  // Create a simple level-based layout
-  const levels: { [key: string]: number } = {};
+  // Build a map of node ids to node objects for quick lookup
+  const nodeMap: { [key: string]: Node } = {};
+  nodes.forEach(node => nodeMap[node.id] = node);
 
-  // Initialize levels based on edges
+  // Build a tree structure from the edges
   edges.forEach(edge => {
-    if (!levels[edge.source]) levels[edge.source] = 0;
-    levels[edge.target] = (levels[edge.source] || 0) + 1;
+    const sourceNode = nodeMap[edge.source];
+    if (!sourceNode.children) sourceNode.children = [];
+    sourceNode.children.push(edge.target);
   });
 
-  // Assign positions to nodes based on their levels
-  const levelNodes: { [key: number]: Node[] } = {};
-  nodes.forEach(node => {
-    const level = levels[node.id] || 0;
-    if (!levelNodes[level]) levelNodes[level] = [];
-    levelNodes[level].push(node);
-  });
+  // Function to calculate positions
+  const calculatePositions = (node: Node, depth: number, position: { x: number; y: number }) => {
+    if (!node) return;
+    
+    node.position = { x: position.x, y: position.y };
 
-  // Calculate positions
-  Object.keys(levelNodes).forEach(levelKey => {
-    const level = parseInt(levelKey);
-    levelNodes[level].forEach((node, index) => {
-      node.position = {
-        x: index * (nodeWidth + horizontalSpacing),
-        y: level * (nodeHeight + verticalSpacing)
-      };
-    });
-  });
+    if (node.children && node.children.length > 0) {
+      const totalWidth = node.children.length * (nodeWidth + horizontalSpacing);
+      let offsetX = position.x - totalWidth / 2 + nodeWidth / 2;
+
+      node.children.forEach(childId => {
+        const childNode = nodeMap[childId];
+        calculatePositions(childNode, depth + 1, {
+          x: offsetX,
+          y: position.y + nodeHeight + verticalSpacing
+        });
+        offsetX += nodeWidth + horizontalSpacing;
+      });
+    }
+  };
+
+  // Find the root node (assumed to be the one without incoming edges)
+  const rootNodeId = nodes.find(node => !edges.some(edge => edge.target === node.id))?.id;
+  if (rootNodeId) {
+    const rootNode = nodeMap[rootNodeId];
+    calculatePositions(rootNode, 0, { x: 0, y: 0 });
+  }
 
   return nodes;
 };
