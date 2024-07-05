@@ -8,7 +8,9 @@ interface Edge {
   target: string;
 }
 
-const getTreeLayoutedNodes = (nodes: Node[], edges: Edge[]): Node[] => {
+type Direction = 'TB' | 'LR' | 'RL' | 'BT';
+
+const getTreeLayoutedNodes = (nodes: Node[], edges: Edge[], direction: Direction = 'TB'): Node[] => {
   const nodeWidth = 172;
   const nodeHeight = 36;
   const verticalSpacing = 50;
@@ -27,15 +29,15 @@ const getTreeLayoutedNodes = (nodes: Node[], edges: Edge[]): Node[] => {
     parentMap[edge.source].push(edge.target);
   });
 
-  // Function to calculate the total width of a node's subtree
-  const calculateSubtreeWidth = (nodeId: string): number => {
+  // Function to calculate the total width/height of a node's subtree
+  const calculateSubtreeSize = (nodeId: string): number => {
     const children = parentMap[nodeId];
     if (!children || children.length === 0) {
-      return nodeWidth;
+      return direction === 'TB' || direction === 'BT' ? nodeWidth : nodeHeight;
     }
-    return children.reduce((width, childId) => {
-      return width + calculateSubtreeWidth(childId) + horizontalSpacing;
-    }, -horizontalSpacing); // Subtract horizontalSpacing to avoid extra space after the last child
+    return children.reduce((size, childId) => {
+      return size + calculateSubtreeSize(childId) + (direction === 'TB' || direction === 'BT' ? horizontalSpacing : verticalSpacing);
+    }, direction === 'TB' || direction === 'BT' ? -horizontalSpacing : -verticalSpacing); // Subtract spacing to avoid extra space after the last child
   };
 
   // Function to calculate positions
@@ -47,19 +49,19 @@ const getTreeLayoutedNodes = (nodes: Node[], edges: Edge[]): Node[] => {
 
     const children = parentMap[nodeId];
     if (children && children.length > 0) {
-      const totalWidth = children.reduce((width, childId) => {
-        return width + calculateSubtreeWidth(childId) + horizontalSpacing;
-      }, -horizontalSpacing); // Subtract horizontalSpacing to avoid extra space after the last child
+      const totalSize = children.reduce((size, childId) => {
+        return size + calculateSubtreeSize(childId) + (direction === 'TB' || direction === 'BT' ? horizontalSpacing : verticalSpacing);
+      }, direction === 'TB' || direction === 'BT' ? -horizontalSpacing : -verticalSpacing); // Subtract spacing to avoid extra space after the last child
 
-      let offsetX = position.x - totalWidth / 2 + nodeWidth / 2;
+      let offset = (direction === 'TB' || direction === 'BT' ? position.x : position.y) - totalSize / 2 + (direction === 'TB' || direction === 'BT' ? nodeWidth / 2 : nodeHeight / 2);
 
       children.forEach(childId => {
-        const childWidth = calculateSubtreeWidth(childId);
+        const childSize = calculateSubtreeSize(childId);
         calculatePositions(childId, depth + 1, {
-          x: offsetX + childWidth / 2 - nodeWidth / 2,
-          y: position.y + nodeHeight + verticalSpacing
+          x: direction === 'TB' || direction === 'BT' ? offset + childSize / 2 - nodeWidth / 2 : (direction === 'LR' ? position.x + nodeWidth + verticalSpacing : position.x - nodeWidth - verticalSpacing),
+          y: direction === 'LR' || direction === 'RL' ? offset + childSize / 2 - nodeHeight / 2 : (direction === 'TB' ? position.y + nodeHeight + verticalSpacing : position.y - nodeHeight - verticalSpacing)
         });
-        offsetX += childWidth + horizontalSpacing;
+        offset += childSize + (direction === 'TB' || direction === 'BT' ? horizontalSpacing : verticalSpacing);
       });
     }
   };
@@ -85,4 +87,11 @@ const nodes: Node[] = [
 
 const edges: Edge[] = [
   { source: '1', target: '2' },
-  { source: '1', target:
+  { source: '1', target: '3' },
+  { source: '2', target: '4' },
+  { source: '2', target: '5' },
+  { source: '3', target: '6' }
+];
+
+const layoutedNodes = getTreeLayoutedNodes(nodes, edges, 'LR'); // Change 'LR' to 'TB', 'BT', or 'RL' as needed
+console.log(layoutedNodes);
