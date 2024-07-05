@@ -1,20 +1,30 @@
-const getCustomLayoutedNodes = (nodes, edges) => {
+interface Node {
+  id: string;
+  position?: { x: number; y: number };
+}
+
+interface Edge {
+  source: string;
+  target: string;
+}
+
+const getCustomLayoutedNodes = (nodes: Node[], edges: Edge[]): Node[] => {
   const nodeWidth = 172;
   const nodeHeight = 36;
   const verticalSpacing = 50;
   const horizontalSpacing = 100;
 
   // Create a simple level-based layout
-  const levels = {};
+  const levels: { [key: string]: number } = {};
 
   // Initialize levels based on edges
   edges.forEach(edge => {
     if (!levels[edge.source]) levels[edge.source] = 0;
-    levels[edge.target] = levels[edge.source] + 1;
+    levels[edge.target] = (levels[edge.source] || 0) + 1;
   });
 
   // Assign positions to nodes based on their levels
-  const levelNodes = {};
+  const levelNodes: { [key: number]: Node[] } = {};
   nodes.forEach(node => {
     const level = levels[node.id] || 0;
     if (!levelNodes[level]) levelNodes[level] = [];
@@ -22,7 +32,8 @@ const getCustomLayoutedNodes = (nodes, edges) => {
   });
 
   // Calculate positions
-  Object.keys(levelNodes).forEach(level => {
+  Object.keys(levelNodes).forEach(levelKey => {
+    const level = parseInt(levelKey);
     levelNodes[level].forEach((node, index) => {
       node.position = {
         x: index * (nodeWidth + horizontalSpacing),
