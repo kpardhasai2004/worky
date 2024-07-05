@@ -27,6 +27,17 @@ const getTreeLayoutedNodes = (nodes: Node[], edges: Edge[]): Node[] => {
     parentMap[edge.source].push(edge.target);
   });
 
+  // Function to calculate the total width of a node's subtree
+  const calculateSubtreeWidth = (nodeId: string): number => {
+    const children = parentMap[nodeId];
+    if (!children || children.length === 0) {
+      return nodeWidth;
+    }
+    return children.reduce((width, childId) => {
+      return width + calculateSubtreeWidth(childId) + horizontalSpacing;
+    }, -horizontalSpacing); // Subtract horizontalSpacing to avoid extra space after the last child
+  };
+
   // Function to calculate positions
   const calculatePositions = (nodeId: string, depth: number, position: { x: number; y: number }) => {
     const node = nodeMap[nodeId];
@@ -36,15 +47,19 @@ const getTreeLayoutedNodes = (nodes: Node[], edges: Edge[]): Node[] => {
 
     const children = parentMap[nodeId];
     if (children && children.length > 0) {
-      const totalWidth = children.length * (nodeWidth + horizontalSpacing);
+      const totalWidth = children.reduce((width, childId) => {
+        return width + calculateSubtreeWidth(childId) + horizontalSpacing;
+      }, -horizontalSpacing); // Subtract horizontalSpacing to avoid extra space after the last child
+
       let offsetX = position.x - totalWidth / 2 + nodeWidth / 2;
 
       children.forEach(childId => {
+        const childWidth = calculateSubtreeWidth(childId);
         calculatePositions(childId, depth + 1, {
-          x: offsetX,
+          x: offsetX + childWidth / 2 - nodeWidth / 2,
           y: position.y + nodeHeight + verticalSpacing
         });
-        offsetX += nodeWidth + horizontalSpacing;
+        offsetX += childWidth + horizontalSpacing;
       });
     }
   };
@@ -70,11 +85,4 @@ const nodes: Node[] = [
 
 const edges: Edge[] = [
   { source: '1', target: '2' },
-  { source: '1', target: '3' },
-  { source: '2', target: '4' },
-  { source: '2', target: '5' },
-  { source: '3', target: '6' }
-];
-
-const layoutedNodes = getTreeLayoutedNodes(nodes, edges);
-console.log(layoutedNodes);
+  { source: '1', target:
