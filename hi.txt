@@ -9,7 +9,7 @@ interface Edge {
   target: string;
 }
 
-const getTreeLayoutedNodes = (nodes: Node[], edges: Edge[]): Node[] => {
+const getCustomLayoutedNodes = (nodes: Node[], edges: Edge[]): Node[] => {
   const nodeWidth = 172;
   const nodeHeight = 36;
   const verticalSpacing = 50;
