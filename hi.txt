@@ -1,97 +1,302 @@
-interface Node {
-  id: string;
-  position?: { x: number; y: number };
-}
+Certainly! Here's a slide-based version of the guide, each section divided into separate slides for clarity.
 
-interface Edge {
-  source: string;
-  target: string;
-}
+---
 
-type Direction = 'TB' | 'LR' | 'RL' | 'BT';
+### Slide 1: Title
+# React Testing Library: A Comprehensive Guide
 
-const getTreeLayoutedNodes = (nodes: Node[], edges: Edge[], direction: Direction = 'TB'): Node[] => {
-  const nodeWidth = 172;
-  const nodeHeight = 36;
-  const verticalSpacing = 50;
-  const horizontalSpacing = 100;
+---
 
-  // Build a map of node ids to node objects for quick lookup
-  const nodeMap: { [key: string]: Node } = {};
-  nodes.forEach(node => nodeMap[node.id] = node);
+### Slide 2: Introduction
+- **React Testing Library (RTL)** is a lightweight solution for testing React components by simulating user interactions and verifying outputs.
 
-  // Build a parent-children map from the edges
-  const parentMap: { [key: string]: string[] } = {};
-  edges.forEach(edge => {
-    if (!parentMap[edge.source]) {
-      parentMap[edge.source] = [];
-    }
-    parentMap[edge.source].push(edge.target);
+---
+
+### Slide 3: Basic Concepts
+- **`describe` block:** Groups related tests.
+- **`it` block:** Individual test cases.
+
+---
+
+### Slide 4: Importing Required Functions
+```javascript
+import { render, fireEvent, screen } from '@testing-library/react';
+```
+
+---
+
+### Slide 5: Render Function Usage
+```javascript
+const { unmount, container, ...queries } = render(Component);
+```
+
+---
+
+### Slide 6: Render Function Returns
+- `unmount`: Function to unmount the component.
+- `container`: Reference to the DOM node where the component is mounted.
+- All queries from DOM Testing Library, bound to the document.
+
+---
+
+### Slide 7: Example Test Case
+```javascript
+test('loads items eventually', async () => {
+  render(<Page />);
+
+  // Click button
+  fireEvent.click(screen.getByText('Load'));
+
+  // Wait for page to update with query text
+  const items = await screen.findAllByText(/Item #[0-9]: /);
+  expect(items).toHaveLength(10);
+});
+```
+
+---
+
+### Slide 8: Queries
+- RTL queries are based on the document by default, simplifying test syntax.
+
+---
+
+### Slide 9: Query Types
+| Query       | No Match  | 1 Match | 1+ Match | Await? |
+|-------------|------------|---------|----------|--------|
+| getBy       | throw      | return  | throw    | No     |
+| findBy      | throw      | return  | throw    | Yes    |
+| queryBy     | null       | return  | throw    | No     |
+| getAllBy    | throw      | array   | array    | No     |
+| findAllBy   | throw      | array   | array    | Yes    |
+| queryAllBy  | []         | array   | array    | No     |
+
+---
+
+### Slide 10: Specific Queries (1)
+**ByLabelText:** Find by label or aria-label text content
+  - `getByLabelText`
+  - `queryByLabelText`
+  - `getAllByLabelText`
+  - `queryAllByLabelText`
+  - `findByLabelText`
+  - `findAllByLabelText`
+
+ByLabelText: Find by label or aria-label text content
+
+describe('ByLabelText', () => {
+  it('should find an element by its label text', () => {
+    render(<label htmlFor="username">Username</label><input id="username" />);
+    const input = screen.getByLabelText('Username');
+    expect(input).toBeInTheDocument();
   });
+});
 
-  // Function to calculate the total width/height of a node's subtree
-  const calculateSubtreeSize = (nodeId: string): number => {
-    const children = parentMap[nodeId];
-    if (!children || children.length === 0) {
-      return direction === 'TB' || direction === 'BT' ? nodeWidth : nodeHeight;
-    }
-    return children.reduce((size, childId) => {
-      return size + calculateSubtreeSize(childId) + (direction === 'TB' || direction === 'BT' ? horizontalSpacing : verticalSpacing);
-    }, direction === 'TB' || direction === 'BT' ? -horizontalSpacing : -verticalSpacing); // Subtract spacing to avoid extra space after the last child
-  };
+---
 
-  // Function to calculate positions
-  const calculatePositions = (nodeId: string, depth: number, position: { x: number; y: number }) => {
-    const node = nodeMap[nodeId];
-    if (!node) return;
-    
-    node.position = { x: position.x, y: position.y };
+### Slide 11: Specific Queries (2)
+**ByPlaceholderText:** Find by input placeholder value
+  - `getByPlaceholderText`
+  - `queryByPlaceholderText`
+  - `getAllByPlaceholderText`
+  - `queryAllByPlaceholderText`
+  - `findByPlaceholderText`
+  - `findAllByPlaceholderText`
 
-    const children = parentMap[nodeId];
-    if (children && children.length > 0) {
-      const totalSize = children.reduce((size, childId) => {
-        return size + calculateSubtreeSize(childId) + (direction === 'TB' || direction === 'BT' ? horizontalSpacing : verticalSpacing);
-      }, direction === 'TB' || direction === 'BT' ? -horizontalSpacing : -verticalSpacing); // Subtract spacing to avoid extra space after the last child
+ByPlaceholderText: Find by input placeholder value
 
-      let offset = (direction === 'TB' || direction === 'BT' ? position.x : position.y) - totalSize / 2 + (direction === 'TB' || direction === 'BT' ? nodeWidth / 2 : nodeHeight / 2);
+describe('ByPlaceholderText', () => {
+  it('should find an element by its placeholder text', () => {
+    render(<input placeholder="Enter your name" />);
+    const input = screen.getByPlaceholderText('Enter your name');
+    expect(input).toBeInTheDocument();
+  });
+});
 
-      children.forEach(childId => {
-        const childSize = calculateSubtreeSize(childId);
-        calculatePositions(childId, depth + 1, {
-          x: direction === 'TB' || direction === 'BT' ? offset + childSize / 2 - nodeWidth / 2 : (direction === 'LR' ? position.x + nodeWidth + verticalSpacing : position.x - nodeWidth - verticalSpacing),
-          y: direction === 'LR' || direction === 'RL' ? offset + childSize / 2 - nodeHeight / 2 : (direction === 'TB' ? position.y + nodeHeight + verticalSpacing : position.y - nodeHeight - verticalSpacing)
-        });
-        offset += childSize + (direction === 'TB' || direction === 'BT' ? horizontalSpacing : verticalSpacing);
-      });
-    }
-  };
+---
 
-  // Find the root node (assumed to be the one without incoming edges)
-  const rootNodeId = nodes.find(node => !edges.some(edge => edge.target === node.id))?.id;
-  if (rootNodeId) {
-    calculatePositions(rootNodeId, 0, { x: 0, y: 0 });
-  }
+### Slide 12: Specific Queries (3)
+**ByText:** Find by element text content
+  - `getByText`
+  - `queryByText`
+  - `getAllByText`
+  - `queryAllByText`
+  - `findByText`
+  - `findAllByText`
 
-  return nodes;
-};
+ByText: Find by element text content
 
-// Example usage
-const nodes: Node[] = [
-  { id: '1' },
-  { id: '2' },
-  { id: '3' },
-  { id: '4' },
-  { id: '5' },
-  { id: '6' }
-];
+describe('ByText', () => {
+  it('should find an element by its text content', () => {
+    render(<div>Hello World</div>);
+    const div = screen.getByText('Hello World');
+    expect(div).toBeInTheDocument();
+  });
+});
 
-const edges: Edge[] = [
-  { source: '1', target: '2' },
-  { source: '1', target: '3' },
-  { source: '2', target: '4' },
-  { source: '2', target: '5' },
-  { source: '3', target: '6' }
-];
+---
 
-const layoutedNodes = getTreeLayoutedNodes(nodes, edges, 'LR'); // Change 'LR' to 'TB', 'BT', or 'RL' as needed
-console.log(layoutedNodes);
+### Slide 13: Specific Queries (4)
+**ByDisplayValue:** Find by form element current value
+  - `getByDisplayValue`
+  - `queryByDisplayValue`
+  - `getAllByDisplayValue`
+  - `queryAllByDisplayValue`
+  - `findByDisplayValue`
+  - `findAllByDisplayValue`
+
+ByDisplayValue: Find by form element current value
+
+describe('ByDisplayValue', () => {
+  it('should find an element by its current value', () => {
+    render(<input value="John Doe" />);
+    const input = screen.getByDisplayValue('John Doe');
+    expect(input).toBeInTheDocument();
+  });
+});
+
+---
+
+### Slide 14: Specific Queries (5)
+**ByAltText:** Find by img alt attribute
+  - `getByAltText`
+  - `queryByAltText`
+  - `getAllByAltText`
+  - `queryAllByAltText`
+  - `findByAltText`
+  - `findAllByAltText`
+
+ByAltText: Find by img alt attribute
+
+describe('ByAltText', () => {
+  it('should find an image by its alt text', () => {
+    render(<img alt="Profile Picture" src="profile.jpg" />);
+    const img = screen.getByAltText('Profile Picture');
+    expect(img).toBeInTheDocument();
+  });
+});
+
+---
+
+### Slide 15: Specific Queries (6)
+**ByTitle:** Find by title attribute or svg title tag
+  - `getByTitle`
+  - `queryByTitle`
+  - `getAllByTitle`
+  - `queryAllByTitle`
+  - `findByTitle`
+  - `findAllByTitle`
+
+ByTitle: Find by title attribute or svg title tag
+
+describe('ByTitle', () => {
+  it('should find an element by its title attribute', () => {
+    render(<span title="Close">X</span>);
+    const span = screen.getByTitle('Close');
+    expect(span).toBeInTheDocument();
+  });
+});
+
+---
+
+### Slide 16: Specific Queries (7)
+**ByRole:** Find by aria role
+  - `getByRole`
+  - `queryByRole`
+  - `getAllByRole`
+  - `queryAllByRole`
+  - `findByRole`
+  - `findAllByRole`
+
+ByRole: Find by aria role
+
+describe('ByRole', () => {
+  it('should find an element by its role', () => {
+    render(<button role="button">Click me</button>);
+    const button = screen.getByRole('button');
+    expect(button).toBeInTheDocument();
+  });
+});
+
+---
+
+### Slide 17: Specific Queries (8)
+**ByTestId:** Find by data-testid attribute
+  - `getByTestId`
+  - `queryByTestId`
+  - `getAllByTestId`
+  - `queryAllByTestId`
+  - `findByTestId`
+  - `findAllByTestId`
+
+ByTestId: Find by data-testid attribute
+
+describe('ByTestId', () => {
+  it('should find an element by its test id', () => {
+    render(<div data-testid="custom-element">Custom Element</div>);
+    const element = screen.getByTestId('custom-element');
+    expect(element).toBeInTheDocument();
+  });
+});
+
+
+---
+
+### Slide 18: Async Utilities
+- **waitFor:** Retry the function until it stops throwing or times out.
+- **waitForElementToBeRemoved:** Retry the function until it no longer returns a DOM node.
+
+---
+
+### Slide 19: Events
+- **fireEvent:** Trigger DOM events.
+  ```javascript
+  fireEvent.click(node);
+  ```
+
+---
+
+### Slide 20: Other Utilities (1)
+- **within:** Take a node and return an object with all queries bound to the node.
+- **configure:** Change global options.
+  ```javascript
+  configure({ testIdAttribute: 'my-data-test-id' });
+  ```
+
+---
+
+### Slide 21: Other Utilities (2)
+- **cleanup:** Clears the DOM, useful in `afterEach`.
+
+---
+
+### Slide 22: Text Match Options (1)
+Given the following HTML:
+```html
+<div>Hello World</div>
+```
+- **Full string match:**
+  ```javascript
+  getByText('Hello World');
+  ```
+
+---
+
+### Slide 23: Text Match Options (2)
+- **Substring match:**
+  ```javascript
+  getByText('llo Worl', { exact: false });
+  ```
+- **Ignore case:**
+  ```javascript
+  getByText('hello world', { exact: false });
+  ```
+
+---
+
+### Slide 24: Conclusion
+- React Testing Library is a powerful tool for testing React components by focusing on user interactions and realistic use cases.
+- Utilize its robust set of queries and utilities to write effective and maintainable tests.
+
+---
+
+Feel free to adjust the content and order of the slides based on your preferences and the specific requirements of your presentation.
