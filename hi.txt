@@ -300,3 +300,15 @@ Given the following HTML:
 ---
 
 Feel free to adjust the content and order of the slides based on your preferences and the specific requirements of your presentation.
+
+beforeEach and afterEach: These are Jest functions used to set up and clean up tests.
+
+render: Renders a React component into the testing environment.
+
+screen: Provides access to the rendered output, allowing you to query elements.
+
+fireEvent and userEvent: Simulate user interactions.
+
+waitFor, waitForElementToBeRemoved: Wait for an element to appear or disappear.
+
+Queries: Various query functions like getByText, getByRole, getByTestId, etc.
