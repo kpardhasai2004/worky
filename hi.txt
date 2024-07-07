@@ -312,3 +312,18 @@ fireEvent and userEvent: Simulate user interactions.
 waitFor, waitForElementToBeRemoved: Wait for an element to appear or disappear.
 
 Queries: Various query functions like getByText, getByRole, getByTestId, etc.
+
+
+describe('Page Component', () => {
+  it('loads items eventually', async () => {
+    render(<Page />);
+
+    // Click button
+    fireEvent.click(screen.getByText('Load'));
+
+    // Wait for page to update with query text
+    const items = await screen.findAllByText(/Item #[0-9]: /);
+    expect(items).toHaveLength(10);
+  });
+});
+
