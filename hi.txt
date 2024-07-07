@@ -326,4 +326,23 @@ describe('Page Component', () => {
     expect(items).toHaveLength(10);
   });
 });
+---
 
+### Slide 9: Summary
+| Query Type | Synchronous/Asynchronous | Failure Mode          | Use Case                                          |
+|------------|---------------------------|-----------------------|--------------------------------------------------|
+| `get`      | Synchronous               | Throws error          | Element should be present immediately             |
+| `query`    | Synchronous               | Returns `null`        | Element might not be present, and that's okay     |
+| `find`     | Asynchronous              | Throws error after timeout | Element should appear eventually (dynamic content) |
+
+---
+
+### Slide 10: Conclusion
+- **Choosing the Right Query**: Selecting the appropriate query type depends on your specific testing needs.
+- **`get` Queries**: For elements that should always be present.
+- **`query` Queries**: For elements that might not be present, and that's acceptable.
+- **`find` Queries**: For elements that are expected to appear after some delay or asynchronous operation.
+
+---
+
+This slide deck should help illustrate the differences and appropriate use cases for `get`, `query`, and `find` queries in React Testing Library.
