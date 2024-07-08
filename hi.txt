@@ -1,3 +1,14 @@
+ expect(screen.getByRole('tooltip')).toHaveTextContent(tooltipText);
+
+
+
+
+
+
+
+
+
+
 Certainly! Here's a slide-based version of the guide, each section divided into separate slides for clarity.
 
 ---
