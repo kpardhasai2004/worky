@@ -1,16 +1,83 @@
+import React from 'react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import '@testing-library/jest-dom/extend-expect'; // For the "toBeInTheDocument" matcher
+import { ReactFlowProvider } from 'reactflow';
+import FlowComponent from './FlowComponent';
 
+describe('FlowComponent', () => {
+  const nodes = [
+    {
+      id: '1',
+      data: { label: 'Node 1' },
+      position: { x: 250, y: 5 },
+    },
+    {
+      id: '2',
+      data: { label: 'Node 2' },
+      position: { x: 100, y: 100 },
+    },
+  ];
 
+  const edges = [{ id: 'e1-2', source: '1', target: '2' }];
 
-const calculateNodeWidth = (label: string): number => {
-  const baseWidth = 50; // Minimum width
-  const widthPerCharacter = 8; // Width per character
-  return baseWidth + label.length * widthPerCharacter;
-};
+  it('should highlight a node when clicked', () => {
+    render(
+      <ReactFlowProvider>
+        <FlowComponent nodes={nodes} edges={edges} />
+      </ReactFlowProvider>
+    );
 
+    const nodeElement = screen.getByText('Node 1');
+    fireEvent.click(nodeElement);
 
-nodes.forEach(node => {
-    node.width = calculateNodeWidth(node.label);
+    expect(nodeElement.parentElement).toHaveStyle('border: 2px solid red');
   });
+
+  it('should remove highlight from previously selected node when another node is clicked', () => {
+    render(
+      <ReactFlowProvider>
+        <FlowComponent nodes={nodes} edges={edges} />
+      </ReactFlowProvider>
+    );
+
+    const node1Element = screen.getByText('Node 1');
+    const node2Element = screen.getByText('Node 2');
+    fireEvent.click(node1Element);
+
+    expect(node1Element.parentElement).toHaveStyle('border: 2px solid red');
+    expect(node2Element.parentElement).toHaveStyle('border: none');
+
+    fireEvent.click(node2Element);
+
+    expect(node1Element.parentElement).toHaveStyle('border: none');
+    expect(node2Element.parentElement).toHaveStyle('border: 2px solid red');
+  });
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
