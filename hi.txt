@@ -1,59 +1,44 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/extend-expect'; // For the "toBeInTheDocument" matcher
-import { ReactFlowProvider } from 'reactflow';
-import FlowComponent from './FlowComponent';
+import axios from 'axios';
+import MyComponent from './MyComponent';
 
-describe('FlowComponent', () => {
-  const nodes = [
-    {
-      id: '1',
-      data: { label: 'Node 1' },
-      position: { x: 250, y: 5 },
-    },
-    {
-      id: '2',
-      data: { label: 'Node 2' },
-      position: { x: 100, y: 100 },
-    },
-  ];
+// Mock axios
+jest.mock('axios');
+const mockedAxios = axios as jest.Mocked<typeof axios>;
 
-  const edges = [{ id: 'e1-2', source: '1', target: '2' }];
+describe('MyComponent', () => {
+  it('should update the input value and submit the correct taskId', async () => {
+    const taskId = '12345';
+    const mockResponse = { data: 'mocked data' };
 
-  it('should highlight a node when clicked', () => {
-    render(
-      <ReactFlowProvider>
-        <FlowComponent nodes={nodes} edges={edges} />
-      </ReactFlowProvider>
-    );
+    mockedAxios.get.mockResolvedValueOnce(mockResponse);
 
-    const nodeElement = screen.getByText('Node 1');
-    fireEvent.click(nodeElement);
+    render(<MyComponent />);
 
-    expect(nodeElement.parentElement).toHaveStyle('border: 2px solid red');
-  });
+    const inputElement = screen.getByPlaceholderText('Enter Task ID') as HTMLInputElement;
+    const buttonElement = screen.getByText('Submit');
 
-  it('should remove highlight from previously selected node when another node is clicked', () => {
-    render(
-      <ReactFlowProvider>
-        <FlowComponent nodes={nodes} edges={edges} />
-      </ReactFlowProvider>
-    );
+    // Simulate user typing in the input
+    fireEvent.change(inputElement, { target: { value: taskId } });
 
-    const node1Element = screen.getByText('Node 1');
-    const node2Element = screen.getByText('Node 2');
-    fireEvent.click(node1Element);
+    // Check that the input value is updated
+    expect(inputElement.value).toBe(taskId);
 
-    expect(node1Element.parentElement).toHaveStyle('border: 2px solid red');
-    expect(node2Element.parentElement).toHaveStyle('border: none');
+    // Simulate clicking the submit button
+    fireEvent.click(buttonElement);
 
-    fireEvent.click(node2Element);
+    // Check that axios.get was called with the correct parameters
+    expect(mockedAxios.get).toHaveBeenCalledWith('http://localhost:8180/swagger/getJson', {
+      params: { taskId: taskId },
+    });
 
-    expect(node1Element.parentElement).toHaveStyle('border: none');
-    expect(node2Element.parentElement).toHaveStyle('border: 2px solid red');
+    // Optionally, you can wait for the async operation and verify any additional behaviors
+    // For example, checking the console.log output, etc.
+    // await screen.findByText('mocked data'); // This is just an example, adjust as needed
   });
 });
-
 
 
 
