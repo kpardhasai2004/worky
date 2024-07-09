@@ -1,4 +1,28 @@
- expect(screen.getByRole('tooltip')).toHaveTextContent(tooltipText);
+
+
+
+const calculateNodeWidth = (label: string): number => {
+  const baseWidth = 50; // Minimum width
+  const widthPerCharacter = 8; // Width per character
+  return baseWidth + label.length * widthPerCharacter;
+};
+
+
+nodes.forEach(node => {
+    node.width = calculateNodeWidth(node.label);
+  });
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
