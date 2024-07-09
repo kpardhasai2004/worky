@@ -1,19 +1,28 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import '@testing-library/jest-dom/extend-expect'; // For the "toBeInTheDocument" matcher
+import '@testing-library/jest-dom/extend-expect';
+import userEvent from '@testing-library/user-event';
 import axios from 'axios';
+import MockAdapter from 'axios-mock-adapter';
 import MyComponent from './MyComponent';
-
-// Mock axios
-jest.mock('axios');
-const mockedAxios = axios as jest.Mocked<typeof axios>;
+import { expect } from 'chai';
 
 describe('MyComponent', () => {
+  let mock: MockAdapter;
+
+  beforeEach(() => {
+    mock = new MockAdapter(axios);
+  });
+
+  afterEach(() => {
+    mock.reset();
+  });
+
   it('should update the input value and submit the correct taskId', async () => {
     const taskId = '12345';
     const mockResponse = { data: 'mocked data' };
 
-    mockedAxios.get.mockResolvedValueOnce(mockResponse);
+    mock.onGet('http://localhost:8180/swagger/getJson', { params: { taskId: taskId } }).reply(200, mockResponse);
 
     render(<MyComponent />);
 
@@ -21,24 +30,22 @@ describe('MyComponent', () => {
     const buttonElement = screen.getByText('Submit');
 
     // Simulate user typing in the input
-    fireEvent.change(inputElement, { target: { value: taskId } });
+    userEvent.type(inputElement, taskId);
 
     // Check that the input value is updated
-    expect(inputElement.value).toBe(taskId);
+    expect(inputElement.value).to.equal(taskId);
 
     // Simulate clicking the submit button
-    fireEvent.click(buttonElement);
+    userEvent.click(buttonElement);
 
     // Check that axios.get was called with the correct parameters
-    expect(mockedAxios.get).toHaveBeenCalledWith('http://localhost:8180/swagger/getJson', {
-      params: { taskId: taskId },
-    });
+    await screen.findByText('mocked data'); // Assuming the data is rendered somewhere
 
-    // Optionally, you can wait for the async operation and verify any additional behaviors
-    // For example, checking the console.log output, etc.
-    // await screen.findByText('mocked data'); // This is just an example, adjust as needed
+    expect(mock.history.get.length).to.equal(1);
+    expect(mock.history.get[0].params).to.deep.equal({ taskId: taskId });
   });
 });
+
 
 
 
