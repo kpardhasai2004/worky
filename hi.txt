@@ -1,68 +1,20 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import '@testing-library/jest-dom';
-import CustomMinimap from './CustomMinimap';
-import { useReactFlow } from 'react-flow-renderer';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import CtrlBFocusComponent from './CtrlBFocusComponent';
 
-// Mocking useReactFlow hook
-jest.mock('react-flow-renderer', () => ({
-  ...jest.requireActual('react-flow-renderer'),
-  useReactFlow: jest.fn(),
-}));
+test('focuses on the text field and calls onCtrlB when Ctrl + B is pressed', () => {
+  const handleCtrlB = jest.fn();
+  render(<CtrlBFocusComponent onCtrlB={handleCtrlB} />);
 
-const setViewportMock = jest.fn();
-(useReactFlow as jest.Mock).mockReturnValue({ setViewport: setViewportMock });
+  const textField = screen.getByTestId('text-field');
 
-const runTests = async () => {
-  describe('CustomMinimap Component', () => {
-    beforeEach(() => {
-      setViewportMock.mockClear();
-    });
+  userEvent.keyboard('{ctrl}{b}');
 
-    it('should render without crashing', () => {
-      render(<CustomMinimap />);
-      const minimap = screen.getByRole('minimap');
-      expect(minimap).toBeInTheDocument();
-    });
-
-    it('should start dragging on mouse down', () => {
-      render(<CustomMinimap />);
-      const minimap = screen.getByRole('minimap');
-      fireEvent.mouseDown(minimap);
-      expect(minimap.style.cursor).toBe('grabbing');
-    });
-
-    it('should update viewport on mouse move while dragging', () => {
-      render(<CustomMinimap />);
-      const minimap = screen.getByRole('minimap');
-      fireEvent.mouseDown(minimap);
-      fireEvent.mouseMove(minimap, { clientX: 50, clientY: 50 });
-      expect(setViewportMock).toHaveBeenCalled();
-    });
-
-    it('should stop dragging on mouse up', () => {
-      render(<CustomMinimap />);
-      const minimap = screen.getByRole('minimap');
-      fireEvent.mouseDown(minimap);
-      fireEvent.mouseUp(minimap);
-      expect(minimap.style.cursor).toBe('grab');
-    });
-  });
-
-  // Run all tests
-  await new Promise((resolve) => {
-    setTimeout(resolve, 0);
-  });
-
-  // Report results
-  const { pass, fail, pending, testResults } = window.jestReport();
-  console.log('Pass:', pass, 'Fail:', fail, 'Pending:', pending);
-  testResults.forEach((result) => {
-    console.log(result);
-  });
-};
-
-runTests();
+  expect(handleCtrlB).toHaveBeenCalledTimes(1);
+  expect(handleCtrlB).toHaveBeenCalledWith(textField);
+  expect(textField).toHaveFocus();
+});
 
 
 
