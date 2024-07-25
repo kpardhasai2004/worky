@@ -14,7 +14,11 @@ export default ActionButton;
 
 
 
+const [dialogValue, setDialogValue] = useState(null);
 
+  const showDialog = (value) => {
+    setDialogValue(value);
+  };
 
 
 
