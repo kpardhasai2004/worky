@@ -1,20 +1,57 @@
-import React from 'react';
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import CtrlBFocusComponent from './CtrlBFocusComponent';
+import React, { useState, useRef } from 'react';
+import { AgGridReact } from 'ag-grid-react';
+import 'ag-grid-community/styles/ag-grid.css';
+import 'ag-grid-community/styles/ag-theme-alpine.css';
 
-test('focuses on the text field and calls onCtrlB when Ctrl + B is pressed', () => {
-  const handleCtrlB = jest.fn();
-  render(<CtrlBFocusComponent onCtrlB={handleCtrlB} />);
+const GridExample = () => {
+  const [rowData, setRowData] = useState([
+    { make: 'Toyota', model: 'Celica', price: 35000 },
+    { make: 'Ford', model: 'Mondeo', price: 32000 },
+    { make: 'Porsche', model: 'Boxster', price: 72000 }
+  ]);
 
-  const textField = screen.getByTestId('text-field');
+  const [columnDefs] = useState([
+    { field: 'make' },
+    { field: 'model' },
+    { field: 'price' },
+    {
+      headerName: 'Actions',
+      cellRendererFramework: (params) => (
+        <button onClick={() => handleActionClick(params)}>Action</button>
+      )
+    }
+  ]);
 
-  userEvent.keyboard('{ctrl}{b}');
+  const gridRef = useRef(null);
 
-  expect(handleCtrlB).toHaveBeenCalledTimes(1);
-  expect(handleCtrlB).toHaveBeenCalledWith(textField);
-  expect(textField).toHaveFocus();
-});
+  const [dialogData, setDialogData] = useState(null);
+
+  const handleActionClick = (params) => {
+    setDialogData(params.data);
+  };
+
+  return (
+    <div>
+      {dialogData && (
+        <div className="dialog">
+          <h3>Row Data</h3>
+          <pre>{JSON.stringify(dialogData, null, 2)}</pre>
+          <button onClick={() => setDialogData(null)}>Close</button>
+        </div>
+      )}
+      <div className="ag-theme-alpine" style={{ height: 400, width: 600 }}>
+        <AgGridReact
+          ref={gridRef}
+          rowData={rowData}
+          columnDefs={columnDefs}
+        />
+      </div>
+    </div>
+  );
+};
+
+export default GridExample;
+
 
 
 
