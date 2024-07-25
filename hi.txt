@@ -1,29 +1,15 @@
-import React from 'react';
-
-const ActionButton = ({ value, data, context }) => {
-  const handleClick = () => {
-    context.showDialog(data);
-  };
-
-  return <button onClick={handleClick}>Action</button>;
-};
-
-export default ActionButton;
 
 
 
 
-
-const [dialogValue, setDialogValue] = useState(null);
-
-  const showDialog = (value) => {
-    setDialogValue(value);
-  };
-
-
-
-
-
+cellRendererParams: {
+        context: {
+          setPrice: (value) => {
+            console.log('Price set to:', value); // Log the price set to check if it is correct
+            setPrice(value);
+          }
+        }
+      }
 
 
 
