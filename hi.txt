@@ -39,47 +39,61 @@ const ApiDialog = ({ apiCall, onClose }) => {
 
 export default ApiDialog;
 
+import React, { useState } from 'react';
+import axios from 'axios';
+import ApiDialog from './ApiDialog'; // Import the ApiDialog component
 
-import React, { useState, useEffect } from 'react';
+const fetchApiData = async () => {
+  const response = await axios.get('https://api.example.com/data');
+  return response.data;
+};
 
-const ApiDialog = ({ apiCall, onClose }) => {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+const App = () => {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await apiCall();
-        setData(response);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const handleOpenDialog = () => {
+    setIsDialogOpen(true);
+  };
 
-    fetchData();
-  }, [apiCall]);
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
+  };
 
   return (
-    <div className="dialog-backdrop">
-      <div className="dialog">
-        {loading && <p>Loading...</p>}
-        {error && <p>Error: {error}</p>}
-        {data && (
-          <div>
-            <h3>API Response:</h3>
-            <pre>{JSON.stringify(data, null, 2)}</pre>
-          </div>
-        )}
-        <button onClick={onClose}>Close</button>
-      </div>
+    <div>
+      <button onClick={handleOpenDialog}>Fetch Data</button>
+      {isDialogOpen && (
+        <ApiDialog apiCall={fetchApiData} onClose={handleCloseDialog} />
+      )}
     </div>
   );
 };
 
-export default ApiDialog;
+export default App;
+
+
+/* Add this to your CSS file */
+.dialog-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.dialog {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  max-width: 500px;
+  width: 100%;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
 
 
 
