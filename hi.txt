@@ -1,15 +1,44 @@
+import React, { useState, useEffect } from 'react';
 
+const ApiDialog = ({ apiCall, onClose }) => {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-
-
-cellRendererParams: {
-        context: {
-          setPrice: (value) => {
-            console.log('Price set to:', value); // Log the price set to check if it is correct
-            setPrice(value);
-          }
-        }
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await apiCall();
+        setData(response);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
       }
+    };
+
+    fetchData();
+  }, [apiCall]);
+
+  return (
+    <div className="dialog-backdrop">
+      <div className="dialog">
+        {loading && <p>Loading...</p>}
+        {error && <p>Error: {error}</p>}
+        {data && (
+          <div>
+            <h3>API Response:</h3>
+            <pre>{JSON.stringify(data, null, 2)}</pre>
+          </div>
+        )}
+        <button onClick={onClose}>Close</button>
+      </div>
+    </div>
+  );
+};
+
+export default ApiDialog;
+
 
 
 
